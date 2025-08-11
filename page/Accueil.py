@@ -120,7 +120,7 @@ def show():
     with col3:
         ca_mensuel = stats.get('ca_mensuel_actif', 0)
         st.metric(
-            label="€ CA Mensuel", 
+            label=" CA Mensuel (MAD)", 
             value=formater_montant(ca_mensuel),
             help="Chiffre d'affaires mensuel des contrats actifs"
         )
@@ -252,7 +252,7 @@ def show():
     
     with col1:
         st.metric(
-            label="€ Total Encaissé",
+            label=" Total Encaissé (MAD)",
             value=formater_montant(stats.get('montant_encaisse', 0))
         )
         
