@@ -1,0 +1,24 @@
+/* Style général */
+[data-testid="stAppViewContainer"] {
+    background-color: #f8f9fa;
+}
+
+/* Cartes */
+.stMetric {
+    background-color: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Boutons */
+.stButton>button {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* Tableaux */
+[data-testid="stDataFrame"] {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
