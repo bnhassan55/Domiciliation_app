@@ -1503,13 +1503,6 @@ def show():
             gestion_clients_moraux()
     
     # Footer
-    st.markdown("---")
-    st.markdown(
-        "<div style='text-align: center; color: #666; font-size: 0.8em;'>"
-        "© 2025 App Domiciliation - Tous droits réservés"
-        "</div>", 
-        unsafe_allow_html=True
-    )
 
 # Point d'entrée principal
 if __name__ == "__main__":
