@@ -1,9 +1,4 @@
-# Requirements pour l'application de domiciliation
 streamlit>=1.28.0
 pandas>=1.5.0
 plotly>=5.15.0
-sqlite3
-uuid
-datetime
-re
-os
+reportlab>=3.6.0
