@@ -258,22 +258,22 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
         # Déterminer la table correcte
         table = "clients_physiques" if client_type == "physique" else "clients_moraux"
         
-        print(f"🔍 DEBUG: Modification du client ID={client_id}, Type={client_type}, Table={table}")
-        print(f"🔍 DEBUG: Modifications reçues: {modifications}")
+        print(f" DEBUG: Modification du client ID={client_id}, Type={client_type}, Table={table}")
+        print(f" DEBUG: Modifications reçues: {modifications}")
         
         # ÉTAPE 1: Vérifier l'existence du client
         cursor = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (client_id,))
         client_existant = cursor.fetchone()
         
         if not client_existant:
-            print(f"❌ Client {client_id} non trouvé dans {table}")
+            print(f" Client {client_id} non trouvé dans {table}")
             return False
         
-        print(f"✅ Client trouvé: {dict(client_existant)}")
+        print(f" Client trouvé: {dict(client_existant)}")
         
         # ÉTAPE 2: Vérifier si des modifications sont nécessaires
         if not modifications:
-            print("⚠️ Aucune modification fournie")
+            print(" Aucune modification fournie")
             return True
         
         # ÉTAPE 3: Valider les champs modifiables selon le type
@@ -285,7 +285,7 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
         
         champs_autorises = champs_modifiables.get(client_type, [])
         if not champs_autorises:
-            print(f"❌ Type de client invalide: {client_type}")
+            print(f" Type de client invalide: {client_type}")
             return False
         
         # ÉTAPE 4: Préparer les modifications avec validation des contraintes
@@ -294,7 +294,7 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
         
         for champ, nouvelle_valeur in modifications.items():
             if champ not in champs_autorises:
-                print(f"⚠️ Champ non autorisé ignoré: {champ}")
+                print(f" Champ non autorisé ignoré: {champ}")
                 continue
             
             # Obtenir la valeur actuelle
@@ -308,31 +308,31 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
             if nouvelle_valeur and champ == 'email':
                 from utils import valider_email
                 if not valider_email(nouvelle_valeur):
-                    print(f"❌ Format email invalide pour {champ}: {nouvelle_valeur}")
+                    print(f" Format email invalide pour {champ}: {nouvelle_valeur}")
                     continue
             
             elif nouvelle_valeur and champ in ['cin', 'rep_cin']:
                 from utils import valider_cin
                 if not valider_cin(nouvelle_valeur):
-                    print(f"❌ Format CIN invalide pour {champ}: {nouvelle_valeur}")
+                    print(f" Format CIN invalide pour {champ}: {nouvelle_valeur}")
                     continue
             
             elif nouvelle_valeur and champ == 'ice':
                 from utils import valider_ice
                 if not valider_ice(nouvelle_valeur):
-                    print(f"❌ Format ICE invalide pour {champ}: {nouvelle_valeur}")
+                    print(f" Format ICE invalide pour {champ}: {nouvelle_valeur}")
                     continue
             
             # Ajouter à la liste des modifications si différent
             if str(valeur_actuelle) != str(nouvelle_valeur):
                 modifications_validees[champ] = nouvelle_valeur
-                print(f"📝 Modification détectée - {champ}: '{valeur_actuelle}' → '{nouvelle_valeur}'")
+                print(f" Modification détectée - {champ}: '{valeur_actuelle}' → '{nouvelle_valeur}'")
             else:
-                print(f"➡️ Pas de changement pour {champ}: '{valeur_actuelle}'")
+                print(f" Pas de changement pour {champ}: '{valeur_actuelle}'")
         
         # ÉTAPE 5: Vérifier s'il y a des modifications à effectuer
         if not modifications_validees:
-            print("ℹ️ Aucune modification réelle détectée")
+            print(" Aucune modification réelle détectée")
             return True
         
         # ÉTAPE 6: Vérifier les contraintes d'unicité avant la modification
@@ -352,7 +352,7 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
                         (nouvelle_valeur_unique, client_id)
                     )
                     if cursor_check.fetchone():
-                        print(f"❌ Contrainte d'unicité violée - {nom_affichage} déjà existant: {nouvelle_valeur_unique}")
+                        print(f" Contrainte d'unicité violée - {nom_affichage} déjà existant: {nouvelle_valeur_unique}")
                         return False
         
         # ÉTAPE 7: Construire et exécuter la requête de mise à jour
@@ -367,29 +367,29 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
         
         requete = f"UPDATE {table} SET {', '.join(set_clauses)} WHERE id = ?"
         
-        print(f"🔧 Requête SQL: {requete}")
-        print(f"🔧 Valeurs: {valeurs}")
+        print(f" Requête SQL: {requete}")
+        print(f" Valeurs: {valeurs}")
         
         # ÉTAPE 8: Exécuter la mise à jour avec gestion des erreurs
         cursor_update = conn.execute(requete, valeurs)
         lignes_modifiees = cursor_update.rowcount
         
-        print(f"📊 Lignes affectées par UPDATE: {lignes_modifiees}")
+        print(f" Lignes affectées par UPDATE: {lignes_modifiees}")
         
         if lignes_modifiees == 0:
-            print("❌ Aucune ligne modifiée - Peut-être que l'ID n'existe pas")
+            print(" Aucune ligne modifiée - Peut-être que l'ID n'existe pas")
             return False
         
         # ÉTAPE 9: Valider les changements
         conn.commit()
-        print("✅ Modifications commitées en base de données")
+        print(" Modifications commitées en base de données")
         
         # ÉTAPE 10: Vérification finale des modifications appliquées
         cursor_verif = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (client_id,))
         client_apres = cursor_verif.fetchone()
         
         if client_apres:
-            print(f"✅ Client après modification: {dict(client_apres)}")
+            print(f" Client après modification: {dict(client_apres)}")
             
             # Vérifier chaque modification pour s'assurer qu'elle a été appliquée
             verification_reussie = True
@@ -401,34 +401,34 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
                 valeur_attendue_norm = str(valeur_attendue) if valeur_attendue is not None else ''
                 
                 if valeur_db_norm == valeur_attendue_norm:
-                    print(f"✅ Vérification OK - {champ}: '{valeur_db}'")
+                    print(f" Vérification OK - {champ}: '{valeur_db}'")
                 else:
-                    print(f"❌ Vérification FAILED - {champ}: attendu='{valeur_attendue}', trouvé='{valeur_db}'")
+                    print(f" Vérification FAILED - {champ}: attendu='{valeur_attendue}', trouvé='{valeur_db}'")
                     verification_reussie = False
             
             if not verification_reussie:
-                print("⚠️ Certaines vérifications ont échoué mais la modification a été commitée")
+                print(" Certaines vérifications ont échoué mais la modification a été commitée")
         
         success = lignes_modifiees > 0
-        print(f"🎯 Résultat final: {'SUCCESS' if success else 'FAILED'}")
+        print(f" Résultat final: {'SUCCESS' if success else 'FAILED'}")
         
         return success
         
     except sqlite3.IntegrityError as e:
-        print(f"❌ Erreur d'intégrité lors de la modification: {e}")
+        print(f" Erreur d'intégrité lors de la modification: {e}")
         if "UNIQUE constraint failed" in str(e):
             if "cin" in str(e).lower():
-                print("❌ Cette CIN existe déjà pour un autre client")
+                print(" Cette CIN existe déjà pour un autre client")
             elif "ice" in str(e).lower():
-                print("❌ Cet ICE existe déjà pour une autre entreprise")
+                print(" Cet ICE existe déjà pour une autre entreprise")
         if conn:
             conn.rollback()
         return False
         
     except Exception as e:
-        print(f"❌ Erreur lors de la modification du client {client_id}: {e}")
+        print(f" Erreur lors de la modification du client {client_id}: {e}")
         import traceback
-        print(f"📋 Traceback complet: {traceback.format_exc()}")
+        print(f" Traceback complet: {traceback.format_exc()}")
         if conn:
             conn.rollback()
         return False
@@ -436,7 +436,7 @@ def modifier_client_complet(client_id: int, modifications: Dict, client_type: st
     finally:
         if conn:
             conn.close()
-            print("🔒 Connexion fermée")
+            print(" Connexion fermée")
 
 
 def modifier_client_avec_historique(client_id: int, modifications: Dict, client_type: str, utilisateur: str = "Système") -> bool:
@@ -505,12 +505,12 @@ def modifier_client_avec_historique(client_id: int, modifications: Dict, client_
                     ))
             
             conn.commit()
-            print(f"✅ Historique des modifications enregistré pour le client {client_id}")
+            print(f" Historique des modifications enregistré pour le client {client_id}")
         
         return success
         
     except Exception as e:
-        print(f"❌ Erreur lors de la modification avec historique: {e}")
+        print(f" Erreur lors de la modification avec historique: {e}")
         if conn:
             conn.rollback()
         return False
@@ -622,25 +622,25 @@ def diagnostiquer_modification_client(client_id: int, client_type: str):
         conn = get_db_connection()
         table = "clients_physiques" if client_type == "physique" else "clients_moraux"
         
-        print(f"🔍 DIAGNOSTIC pour client ID={client_id}, type={client_type}")
+        print(f" DIAGNOSTIC pour client ID={client_id}, type={client_type}")
         
         # Vérifier l'existence
         cursor = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (client_id,))
         client = cursor.fetchone()
         
         if client:
-            print(f"✅ Client trouvé dans {table}")
-            print(f"📋 Données actuelles: {dict(client)}")
+            print(f" Client trouvé dans {table}")
+            print(f" Données actuelles: {dict(client)}")
             
             # Vérifier les colonnes de la table
             cursor_cols = conn.execute(f"PRAGMA table_info({table})")
             colonnes = cursor_cols.fetchall()
-            print(f"📝 Colonnes disponibles dans {table}:")
+            print(f" Colonnes disponibles dans {table}:")
             for col in colonnes:
                 print(f"   - {col[1]} ({col[2]})")
                 
         else:
-            print(f"❌ Client non trouvé dans {table}")
+            print(f" Client non trouvé dans {table}")
             
             # Vérifier s'il existe dans l'autre table
             autre_table = "clients_moraux" if client_type == "physique" else "clients_physiques"
@@ -648,11 +648,11 @@ def diagnostiquer_modification_client(client_id: int, client_type: str):
             client_autre = cursor_autre.fetchone()
             
             if client_autre:
-                print(f"⚠️ ATTENTION: Client trouvé dans {autre_table} au lieu de {table}")
+                print(f" ATTENTION: Client trouvé dans {autre_table} au lieu de {table}")
                 print(f"   Vérifiez le paramètre client_type!")
             
     except Exception as e:
-        print(f"❌ Erreur lors du diagnostic: {e}")
+        print(f" Erreur lors du diagnostic: {e}")
     finally:
         if conn:
             conn.close()
@@ -937,22 +937,22 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        print(f"🔍 DEBUG: Modification du contrat ID={contrat_id}")
-        print(f"🔍 DEBUG: Modifications reçues: {modifications}")
+        print(f" DEBUG: Modification du contrat ID={contrat_id}")
+        print(f" DEBUG: Modifications reçues: {modifications}")
         
         # ÉTAPE 1: Vérifier l'existence du contrat
         cursor.execute("SELECT * FROM contrats WHERE id = ?", (contrat_id,))
         contrat_existant = cursor.fetchone()
         
         if not contrat_existant:
-            print(f"❌ Contrat {contrat_id} non trouvé")
+            print(f" Contrat {contrat_id} non trouvé")
             return False
         
-        print(f"✅ Contrat trouvé: {dict(contrat_existant)}")
+        print(f" Contrat trouvé: {dict(contrat_existant)}")
         
         # ÉTAPE 2: Vérifier si des modifications sont nécessaires
         if not modifications:
-            print("⚠️ Aucune modification fournie")
+            print(" Aucune modification fournie")
             return True
         
         # ÉTAPE 3: Validation des champs modifiables
@@ -969,7 +969,7 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
         
         for champ, nouvelle_valeur in modifications.items():
             if champ not in champs_autorises:
-                print(f"⚠️ Champ non autorisé ignoré: {champ}")
+                print(f" Champ non autorisé ignoré: {champ}")
                 continue
             
             # Obtenir la valeur actuelle
@@ -984,26 +984,26 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
                 try:
                     nouvelle_valeur = int(nouvelle_valeur)
                 except (ValueError, TypeError):
-                    print(f"❌ Erreur de conversion pour {champ}: {nouvelle_valeur}")
+                    print(f" Erreur de conversion pour {champ}: {nouvelle_valeur}")
                     continue
             
             elif champ in ['montant_mensuel', 'frais_ouverture', 'depot_garantie'] and nouvelle_valeur is not None:
                 try:
                     nouvelle_valeur = float(nouvelle_valeur)
                 except (ValueError, TypeError):
-                    print(f"❌ Erreur de conversion pour {champ}: {nouvelle_valeur}")
+                    print(f" Erreur de conversion pour {champ}: {nouvelle_valeur}")
                     continue
             
             # Vérifier si la valeur a réellement changé
             if valeur_actuelle != nouvelle_valeur:
                 modifications_validees[champ] = nouvelle_valeur
-                print(f"📝 Modification détectée - {champ}: '{valeur_actuelle}' → '{nouvelle_valeur}'")
+                print(f" Modification détectée - {champ}: '{valeur_actuelle}' → '{nouvelle_valeur}'")
             else:
-                print(f"➡️ Pas de changement pour {champ}: '{valeur_actuelle}'")
+                print(f" Pas de changement pour {champ}: '{valeur_actuelle}'")
         
         # ÉTAPE 5: Vérifier s'il y a des modifications à effectuer
         if not modifications_validees:
-            print("ℹ️ Aucune modification réelle détectée")
+            print(" Aucune modification réelle détectée")
             return True
         
         # ÉTAPE 6: Validations métier spécifiques
@@ -1014,15 +1014,15 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
                 (modifications_validees['numero_contrat'], contrat_id)
             )
             if cursor.fetchone():
-                print(f"❌ Numéro de contrat déjà existant: {modifications_validees['numero_contrat']}")
+                print(f" Numéro de contrat déjà existant: {modifications_validees['numero_contrat']}")
                 return False
         
         if 'montant_mensuel' in modifications_validees and modifications_validees['montant_mensuel'] <= 0:
-            print("❌ Le montant mensuel doit être supérieur à 0")
+            print(" Le montant mensuel doit être supérieur à 0")
             return False
         
         if 'duree_mois' in modifications_validees and modifications_validees['duree_mois'] <= 0:
-            print("❌ La durée doit être supérieure à 0")
+            print(" La durée doit être supérieure à 0")
             return False
         
         # ÉTAPE 7: Construire et exécuter la requête de mise à jour
@@ -1037,16 +1037,16 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
         
         requete = f"UPDATE contrats SET {', '.join(set_clauses)} WHERE id = ?"
         
-        print(f"🔧 Requête SQL: {requete}")
-        print(f"🔧 Valeurs: {valeurs}")
+        print(f" Requête SQL: {requete}")
+        print(f" Valeurs: {valeurs}")
         
         cursor.execute(requete, valeurs)
         lignes_modifiees = cursor.rowcount
         
-        print(f"📊 Lignes affectées par UPDATE: {lignes_modifiees}")
+        print(f" Lignes affectées par UPDATE: {lignes_modifiees}")
         
         if lignes_modifiees == 0:
-            print("❌ Aucune ligne modifiée")
+            print(" Aucune ligne modifiée")
             return False
         
         # ÉTAPE 8: Valider les changements
@@ -1057,31 +1057,31 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
         contrat_apres = cursor.fetchone()
         
         if contrat_apres:
-            print(f"✅ Contrat après modification: {dict(contrat_apres)}")
+            print(f" Contrat après modification: {dict(contrat_apres)}")
             
             # Vérifier chaque modification
             for champ, valeur_attendue in modifications_validees.items():
                 valeur_db = contrat_apres[champ] if hasattr(contrat_apres, champ) else dict(contrat_apres).get(champ)
                 if valeur_db == valeur_attendue:
-                    print(f"✅ Vérification OK - {champ}: {valeur_db}")
+                    print(f" Vérification OK - {champ}: {valeur_db}")
                 else:
-                    print(f"❌ Vérification FAILED - {champ}: attendu={valeur_attendue}, trouvé={valeur_db}")
+                    print(f" Vérification FAILED - {champ}: attendu={valeur_attendue}, trouvé={valeur_db}")
         
         success = lignes_modifiees > 0
-        print(f"🎯 Résultat final: {'SUCCESS' if success else 'FAILED'}")
+        print(f" Résultat final: {'SUCCESS' if success else 'FAILED'}")
         
         return success
         
     except sqlite3.IntegrityError as e:
-        print(f"❌ Erreur d'intégrité lors de la modification: {e}")
+        print(f" Erreur d'intégrité lors de la modification: {e}")
         if conn:
             conn.rollback()
         return False
         
     except Exception as e:
-        print(f"❌ Erreur lors de la modification du contrat {contrat_id}: {e}")
+        print(f" Erreur lors de la modification du contrat {contrat_id}: {e}")
         import traceback
-        print(f"📋 Traceback complet: {traceback.format_exc()}")
+        print(f" Traceback complet: {traceback.format_exc()}")
         if conn:
             conn.rollback()
         return False
@@ -1089,7 +1089,7 @@ def modifier_contrat(contrat_id: int, modifications: dict) -> bool:
     finally:
         if conn:
             conn.close()
-            print("🔒 Connexion fermée")
+            print(" Connexion fermée")
 
 def diagnostiquer_modification_contrat(contrat_id: int):
     """Fonction de diagnostic pour identifier les problèmes de modification de contrat"""
@@ -1097,28 +1097,28 @@ def diagnostiquer_modification_contrat(contrat_id: int):
     try:
         conn = get_db_connection()
         
-        print(f"🔍 DIAGNOSTIC pour contrat ID={contrat_id}")
+        print(f" DIAGNOSTIC pour contrat ID={contrat_id}")
         
         # Vérifier l'existence
         cursor = conn.execute("SELECT * FROM contrats WHERE id = ?", (contrat_id,))
         contrat = cursor.fetchone()
         
         if contrat:
-            print(f"✅ Contrat trouvé")
-            print(f"📋 Données actuelles: {dict(contrat)}")
+            print(f" Contrat trouvé")
+            print(f" Données actuelles: {dict(contrat)}")
             
             # Vérifier les colonnes de la table
             cursor_cols = conn.execute("PRAGMA table_info(contrats)")
             colonnes = cursor_cols.fetchall()
-            print(f"📝 Colonnes disponibles dans contrats:")
+            print(f" Colonnes disponibles dans contrats:")
             for col in colonnes:
                 print(f"   - {col[1]} ({col[2]})")
                 
         else:
-            print(f"❌ Contrat non trouvé")
+            print(f" Contrat non trouvé")
             
     except Exception as e:
-        print(f"❌ Erreur lors du diagnostic: {e}")
+        print(f" Erreur lors du diagnostic: {e}")
     finally:
         if conn:
             conn.close()
@@ -1488,22 +1488,22 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        print(f"🔍 DEBUG: Modification de la facture ID={facture_id}")
-        print(f"🔍 DEBUG: Modifications reçues: {modifications}")
+        print(f" DEBUG: Modification de la facture ID={facture_id}")
+        print(f" DEBUG: Modifications reçues: {modifications}")
         
         # ÉTAPE 1: Vérifier l'existence de la facture
         cursor.execute("SELECT * FROM factures WHERE id = ?", (facture_id,))
         facture_existante = cursor.fetchone()
         
         if not facture_existante:
-            print(f"❌ Facture {facture_id} non trouvée")
+            print(f" Facture {facture_id} non trouvée")
             return False
         
-        print(f"✅ Facture trouvée: {dict(facture_existante)}")
+        print(f" Facture trouvée: {dict(facture_existante)}")
         
         # ÉTAPE 2: Vérifier si des modifications sont nécessaires
         if not modifications:
-            print("⚠️ Aucune modification fournie")
+            print(" Aucune modification fournie")
             return True
         
         # ÉTAPE 3: Validation des champs modifiables
@@ -1520,7 +1520,7 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
         
         for champ, nouvelle_valeur in modifications.items():
             if champ not in champs_autorises:
-                print(f"⚠️ Champ non autorisé ignoré: {champ}")
+                print(f" Champ non autorisé ignoré: {champ}")
                 continue
             
             # Obtenir la valeur actuelle
@@ -1535,26 +1535,26 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
                 try:
                     nouvelle_valeur = int(nouvelle_valeur)
                 except (ValueError, TypeError):
-                    print(f"❌ Erreur de conversion pour {champ}: {nouvelle_valeur}")
+                    print(f" Erreur de conversion pour {champ}: {nouvelle_valeur}")
                     continue
             
             elif champ in ['montant_ht', 'taux_tva', 'montant_tva', 'montant_ttc'] and nouvelle_valeur is not None:
                 try:
                     nouvelle_valeur = float(nouvelle_valeur)
                 except (ValueError, TypeError):
-                    print(f"❌ Erreur de conversion pour {champ}: {nouvelle_valeur}")
+                    print(f" Erreur de conversion pour {champ}: {nouvelle_valeur}")
                     continue
             
             # Vérifier si la valeur a réellement changé
             if valeur_actuelle != nouvelle_valeur:
                 modifications_validees[champ] = nouvelle_valeur
-                print(f"📝 Modification détectée - {champ}: '{valeur_actuelle}' → '{nouvelle_valeur}'")
+                print(f" Modification détectée - {champ}: '{valeur_actuelle}' → '{nouvelle_valeur}'")
             else:
-                print(f"➡️ Pas de changement pour {champ}: '{valeur_actuelle}'")
+                print(f" Pas de changement pour {champ}: '{valeur_actuelle}'")
         
         # ÉTAPE 5: Vérifier s'il y a des modifications à effectuer
         if not modifications_validees:
-            print("ℹ️ Aucune modification réelle détectée")
+            print(" Aucune modification réelle détectée")
             return True
         
         # ÉTAPE 6: Validations métier spécifiques
@@ -1565,15 +1565,15 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
                 (modifications_validees['numero_facture'], facture_id)
             )
             if cursor.fetchone():
-                print(f"❌ Numéro de facture déjà existant: {modifications_validees['numero_facture']}")
+                print(f" Numéro de facture déjà existant: {modifications_validees['numero_facture']}")
                 return False
         
         if 'montant_ht' in modifications_validees and modifications_validees['montant_ht'] <= 0:
-            print("❌ Le montant HT doit être supérieur à 0")
+            print(" Le montant HT doit être supérieur à 0")
             return False
         
         if 'montant_ttc' in modifications_validees and modifications_validees['montant_ttc'] <= 0:
-            print("❌ Le montant TTC doit être supérieur à 0")
+            print(" Le montant TTC doit être supérieur à 0")
             return False
         
         # Vérifier la cohérence des dates
@@ -1582,10 +1582,10 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
                 date_fact = datetime.strptime(str(modifications_validees['date_facture']), '%Y-%m-%d').date()
                 date_ech = datetime.strptime(str(modifications_validees['date_echeance']), '%Y-%m-%d').date()
                 if date_ech < date_fact:
-                    print("❌ La date d'échéance ne peut pas être antérieure à la date de facture")
+                    print(" La date d'échéance ne peut pas être antérieure à la date de facture")
                     return False
             except ValueError:
-                print("❌ Format de date invalide")
+                print(" Format de date invalide")
                 return False
         
         # ÉTAPE 7: Construire et exécuter la requête de mise à jour
@@ -1600,16 +1600,16 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
         
         requete = f"UPDATE factures SET {', '.join(set_clauses)} WHERE id = ?"
         
-        print(f"🔧 Requête SQL: {requete}")
-        print(f"🔧 Valeurs: {valeurs}")
+        print(f" Requête SQL: {requete}")
+        print(f" Valeurs: {valeurs}")
         
         cursor.execute(requete, valeurs)
         lignes_modifiees = cursor.rowcount
         
-        print(f"📊 Lignes affectées par UPDATE: {lignes_modifiees}")
+        print(f" Lignes affectées par UPDATE: {lignes_modifiees}")
         
         if lignes_modifiees == 0:
-            print("❌ Aucune ligne modifiée")
+            print(" Aucune ligne modifiée")
             return False
         
         # ÉTAPE 8: Valider les changements
@@ -1620,31 +1620,31 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
         facture_apres = cursor.fetchone()
         
         if facture_apres:
-            print(f"✅ Facture après modification: {dict(facture_apres)}")
+            print(f" Facture après modification: {dict(facture_apres)}")
             
             # Vérifier chaque modification
             for champ, valeur_attendue in modifications_validees.items():
                 valeur_db = facture_apres[champ] if hasattr(facture_apres, champ) else dict(facture_apres).get(champ)
                 if valeur_db == valeur_attendue:
-                    print(f"✅ Vérification OK - {champ}: {valeur_db}")
+                    print(f" Vérification OK - {champ}: {valeur_db}")
                 else:
-                    print(f"❌ Vérification FAILED - {champ}: attendu={valeur_attendue}, trouvé={valeur_db}")
+                    print(f" Vérification FAILED - {champ}: attendu={valeur_attendue}, trouvé={valeur_db}")
         
         success = lignes_modifiees > 0
-        print(f"🎯 Résultat final: {'SUCCESS' if success else 'FAILED'}")
+        print(f" Résultat final: {'SUCCESS' if success else 'FAILED'}")
         
         return success
         
     except sqlite3.IntegrityError as e:
-        print(f"❌ Erreur d'intégrité lors de la modification: {e}")
+        print(f" Erreur d'intégrité lors de la modification: {e}")
         if conn:
             conn.rollback()
         return False
         
     except Exception as e:
-        print(f"❌ Erreur lors de la modification de la facture {facture_id}: {e}")
+        print(f" Erreur lors de la modification de la facture {facture_id}: {e}")
         import traceback
-        print(f"📋 Traceback complet: {traceback.format_exc()}")
+        print(f" Traceback complet: {traceback.format_exc()}")
         if conn:
             conn.rollback()
         return False
@@ -1652,7 +1652,7 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
     finally:
         if conn:
             conn.close()
-            print("🔒 Connexion fermée")
+            print(" Connexion fermée")
 
 def diagnostiquer_modification_facture(facture_id: int):
     """Fonction de diagnostic pour identifier les problèmes de modification de facture"""
@@ -1660,28 +1660,28 @@ def diagnostiquer_modification_facture(facture_id: int):
     try:
         conn = get_db_connection()
         
-        print(f"🔍 DIAGNOSTIC pour facture ID={facture_id}")
+        print(f" DIAGNOSTIC pour facture ID={facture_id}")
         
         # Vérifier l'existence
         cursor = conn.execute("SELECT * FROM factures WHERE id = ?", (facture_id,))
         facture = cursor.fetchone()
         
         if facture:
-            print(f"✅ Facture trouvée")
-            print(f"📋 Données actuelles: {dict(facture)}")
+            print(f" Facture trouvée")
+            print(f" Données actuelles: {dict(facture)}")
             
             # Vérifier les colonnes de la table
             cursor_cols = conn.execute("PRAGMA table_info(factures)")
             colonnes = cursor_cols.fetchall()
-            print(f"📝 Colonnes disponibles dans factures:")
+            print(f" Colonnes disponibles dans factures:")
             for col in colonnes:
                 print(f"   - {col[1]} ({col[2]})")
                 
         else:
-            print(f"❌ Facture non trouvée")
+            print(f" Facture non trouvée")
             
     except Exception as e:
-        print(f"❌ Erreur lors du diagnostic: {e}")
+        print(f" Erreur lors du diagnostic: {e}")
     finally:
         if conn:
             conn.close()
