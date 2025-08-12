@@ -1,6 +1,9 @@
 import streamlit as st
 from datetime import datetime
 import time
+import hashlib
+import os
+
 
 # Dictionnaire des utilisateurs (username: password)
 USERS = {
@@ -9,66 +12,119 @@ USERS = {
     "manager": "manager456"
 }
 
+SESSION_FILE = ".streamlit_session.txt"
+# Dans votre fichier login.py, modifiez les fonctions de session :
+
+def save_session(username, current_page="Accueil"):
+    """Sauvegarder la session dans un fichier local"""
+    try:
+        session_data = f"{username}|{int(time.time())}|{current_page}"
+        with open(SESSION_FILE, 'w') as f:
+            f.write(session_data)
+    except Exception as e:
+        pass  # Ignorer les erreurs de fichier
+
+def load_session():
+    """Charge la session avec gestion d'erreurs améliorée"""
+    try:
+        if not os.path.exists(SESSION_FILE):
+            return None, "Accueil"
+            
+        with open(SESSION_FILE, 'r') as f:
+            data = f.read().strip()
+            if not data:
+                return None, "Accueil"
+                
+            parts = data.split('|')
+            if len(parts) < 2:
+                return None, "Accueil"
+                
+            username = parts[0]
+            timestamp = parts[1]
+            current_page = parts[2] if len(parts) > 2 else "Accueil"
+            
+            # Vérification expiration (24h)
+            if int(time.time()) - int(timestamp) > 86400:
+                clear_session()  # Nettoie les sessions expirées
+                return None, "Accueil"
+                
+            return username, current_page
+            
+    except Exception as e:
+        print(f"Erreur lecture session: {e}")
+        clear_session()  # Nettoie en cas d'erreur
+        return None, "Accueil"
+
+def clear_session():
+    """Supprimer complètement le fichier de session"""
+    try:
+        if os.path.exists(SESSION_FILE):
+            os.remove(SESSION_FILE)
+        return True
+    except Exception as e:
+        print(f"Erreur suppression session: {e}")
+        return False
+
+def logout_user():
+    """Fonction de déconnexion complète"""
+    # 1. Supprimer le fichier de session
+    clear_session()
+    
+    # 2. Réinitialiser complètement le session_state
+    st.session_state.clear()
+    
+    # 3. Forcer le rechargement complet
+    st.rerun()
+
 def verify_credentials(username, password):
     """Vérification des identifiants avec le dictionnaire"""
     return username in USERS and USERS[username] == password
 
+
+
 def login_page():
     """Interface de connexion principale"""
+    # D'abord vérifier si déjà connecté via session_state
+    if st.session_state.get('logged_in', False):
+        st.rerun()
+        
+    # Ensuite vérifier la session fichier
+    saved_username, _ = load_session()
+    if saved_username:
+        st.session_state.update({
+            'logged_in': True,
+            'username': saved_username,
+            'login_time': datetime.now()
+        })
+        st.rerun()
     
-    # CSS personnalisé pour la page de login
     st.markdown("""
     <style>
-        /* STYLE GARANTI POUR LE BOUTON */
-        div.stButton > button:first-child {
-            background: rgb(237, 225, 207) !important;
-            color: #333 !important;
-            border: 1px solid rgb(210, 195, 170) !important;
-            border-radius: 12px !important;
-            padding: 12px 24px !important;
-            font-weight: 500 !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        div.stButton > button:hover {
-            background: rgb(225, 210, 190) !important;
-            transform: translateY(-2px) !important;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-        }
-        
-        div.stButton > button:active {
-            transform: translateY(0) !important;
-        }
-        /* Masquer l'en-tête complet */
+        /* Gardez tout votre CSS existant ici - ne le changez pas */
         [data-testid="stHeader"] {
             display: none !important;
         }
         
-        /* Masquer l'espace réservé de l'en-tête */
         .stApp > header {
             display: none !important;
         }
         
-        /* Supprimer l'espace vide laissé par l'en-tête */
         .stApp > .block-container {
             padding-top: 0rem !important;
         }
         
-        /* Masquer le menu burger */
         [data-testid="collapsedControl"] {
             display: none !important;
         }
         
-        /* Masquer le footer */
         footer {
             visibility: hidden !important;
         }
         
-        /* Masquer le bouton "Made with Streamlit" */
         .stApp > footer:after {
-            content: "" !important;     
+            content: "" !important;
+        }
 
-        /* Container principal */
         .login-container {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
@@ -78,7 +134,6 @@ def login_page():
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
-        /* Carte de connexion */
         .login-card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -91,8 +146,6 @@ def login_page():
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
-        /* Logo et titre */
-        /* Styles pour centrer le contenu */
         .login-header {
             display: flex;
             flex-direction: column;
@@ -119,7 +172,6 @@ def login_page():
             width: 100%;
         }
         
-        /* Style des champs de saisie */
         .stTextInput > div > div > input {
             border-radius: 12px;
             border: 2px solid #e1e5e9;
@@ -135,58 +187,22 @@ def login_page():
             background: white;
         }
         
-        
-        /* Messages d'erreur et de succès */
-        .login-message {
-            padding: 12px;
-            border-radius: 8px;
-            margin: 15px 0;
-            font-weight: 500;
+        div.stButton > button:first-child {
+            background: rgb(237, 225, 207) !important;
+            color: #333 !important;
+            border: 1px solid rgb(210, 195, 170) !important;
+            border-radius: 12px !important;
+            padding: 12px 24px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s ease !important;
         }
         
-        .error-message {
-            background: #fee;
-            color: #c53030;
-            border: 1px solid #fed7d7;
+        div.stButton > button:hover {
+            background: rgb(225, 210, 190) !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
         }
         
-        .success-message {
-            background: #f0fff4;
-            color: #2d7d32;
-            border: 1px solid #c6f6d5;
-        }
-        
-        /* Animation de chargement */
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* Footer */
-        .login-footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e1e5e9;
-            color: #666;
-            font-size: 14px;
-        }
-        
-        /* Icône de l'entreprise */
-        .company-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
-        
-        /* Responsive */
         @media (max-width: 768px) {
             .login-card {
                 margin: 20px;
@@ -242,6 +258,8 @@ def login_page():
                         # Vérifier les identifiants
                         if verify_credentials(username, password):
                             # Connexion réussie
+                            save_session(username)
+
                             st.session_state.logged_in = True
                             st.session_state.username = username
                             st.session_state.login_time = datetime.now()
@@ -262,6 +280,8 @@ def login_page():
 
 def logout():
     """Fonction de déconnexion"""
+    clear_session()  # Supprime le fichier de session
+    
     # Nettoyer toutes les variables de session liées à l'authentification
     keys_to_remove = ['logged_in', 'username', 'login_time']
     for key in keys_to_remove:
@@ -269,10 +289,18 @@ def logout():
             del st.session_state[key]
     
     st.success("Déconnexion réussie !")
+    time.sleep(1)  # Donne le temps de voir le message
     st.rerun()
 
 def is_logged_in():
     """Vérifier si l'utilisateur est connecté"""
+    if not st.session_state.get('logged_in', False):
+        saved_username = load_session()
+        if saved_username:
+            st.session_state.logged_in = True
+            st.session_state.username = saved_username
+            st.session_state.login_time = datetime.now()
+            return True
     return st.session_state.get('logged_in', False)
 
 def get_current_user():

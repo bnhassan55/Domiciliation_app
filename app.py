@@ -1,9 +1,11 @@
 import streamlit as st
-from login import login_page
+from login import login_page,clear_session
 from PIL import Image
 import os
 import sys
 from db import init_db
+from datetime import datetime
+import time
 
 # Configuration de la page
 st.set_page_config(
@@ -25,7 +27,21 @@ except Exception as e:
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# Gestion de l'authentification
+# Vérification en 2 étapes
+if not st.session_state.logged_in:
+    from login import load_session
+    saved_username, saved_page = load_session()
+    if saved_username:
+        st.session_state.update({
+            'logged_in': True,
+            'username': saved_username,
+            'login_time': datetime.now(),
+            'current_page': saved_page
+        })
+    else:
+        login_page()
+        st.stop()
+
 if not st.session_state.logged_in:
     # Masquer complètement la sidebar pendant la connexion
     st.markdown("""
@@ -247,6 +263,19 @@ st.markdown("""
         padding-bottom: 0.5rem;
         border-bottom: 2px solid #667eea;
     }
+    
+
+    /* Masquer la flèche de masquage/affichage */
+    button[data-testid="collapsedControl"] {
+    display: none !important;
+    }
+
+    /* Masquer tous les contrôles de sidebar */
+    section[data-testid="stSidebar"] button[kind="header"],
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 # Initialisation de la page courante
@@ -285,12 +314,14 @@ with st.sidebar:
     
     # Création des boutons de navigation
     for display_name, page_name in menu_options:
-        # Utiliser des colonnes pour créer un effet de bouton personnalisé
         col1, col2 = st.columns([1, 20])
-        
         with col2:
             if st.button(display_name, key=f"nav_{page_name}", use_container_width=True):
                 st.session_state.current_page = page_name
+                # Sauvegarder aussi dans la session persistante
+                if st.session_state.get('logged_in'):
+                    from login import save_session
+                    save_session(st.session_state.username, page_name)
                 st.rerun()
     
     # Espacement
@@ -304,11 +335,11 @@ with st.sidebar:
     # Bouton de déconnexion en bas
     st.markdown("<br>" * 5, unsafe_allow_html=True)
     if st.button(" Déconnexion", key="logout_btn", use_container_width=True):
-        st.session_state.logged_in = False
-        st.rerun()
-
-# =================== ROUTAGE DES PAGES ===================
-
+        from login import logout_user
+        with st.spinner("Déconnexion en cours..."):
+            logout_user()  # Cette fonction fera le rerun nécessaire
+#===================================+==============================+=======================================+============#
+#===================================+==============================+=======================================+============#
 # Container principal
 main_container = st.container()
 

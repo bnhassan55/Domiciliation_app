@@ -90,7 +90,6 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             contrat_id INTEGER NOT NULL,
             montant REAL NOT NULL,
-            date_paiement TEXT NOT NULL,
             mode_paiement TEXT DEFAULT 'Espèces',
             reference TEXT,
             date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -1300,12 +1299,11 @@ def ajouter_paiement(paiement_data: Dict) -> bool:
     try:
         # Ajouter le paiement
         conn.execute("""
-        INSERT INTO paiements (contrat_id, montant, date_paiement, mode_paiement, reference)
+        INSERT INTO paiements (contrat_id, montant, mode_paiement, reference)
         VALUES (?, ?, ?, ?, ?)
         """, (
             paiement_data['contrat_id'],
             paiement_data['montant'],
-            paiement_data['date_paiement'],
             paiement_data.get('mode_paiement', 'Espèces'),
             paiement_data.get('reference', '')
         ))
@@ -1511,7 +1509,7 @@ def modifier_facture(facture_id: int, modifications: dict) -> bool:
             'numero_facture', 'contrat_id', 'client_id', 'type_facture',
             'date_facture', 'date_echeance', 'periode_debut', 'periode_fin',
             'montant_ht', 'taux_tva', 'montant_tva', 'montant_ttc',
-            'description', 'mode_reglement', 'statut', 'date_paiement'
+            'description', 'mode_reglement', 'statut'
         ]
         
         # ÉTAPE 4: Filtrer et préparer les modifications valides
