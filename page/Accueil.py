@@ -76,7 +76,7 @@ def show():
     # Titre avec HTML personnalisé
     st.markdown("""
     <div class="title-container">
-        <h1 class="dashboard-title">Tableau de Bord</h1>
+        <h1 class="dashboard-title">Tableau de Bord salah</h1>
     </div>
     """, unsafe_allow_html=True)
     
