@@ -9,62 +9,97 @@ def apply_dashboard_css():
     """Appliquer uniquement les styles pour le titre et le bouton de déconnexion"""
     st.markdown("""
     <style>
-    /* Style pour les titres - cohérent avec votre design existant */
-    .title-container {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .dashboard-title {
-        color: white;
-        font-size: 2.5rem;
-        font-weight: bold;
-        margin: 0;
-        text-align: center;
-    }
-    
-    .dashboard-subtitle {
-        color: white;
-        font-size: 1.2rem;
-        margin: 0;
-        text-align: center;
-        opacity: 0.9;
-    }
-    
-    /* Style pour le bouton d'actualisation - cohérent avec votre design */
-    .stButton > button {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 0.5rem 1rem;
-        font-weight: bold;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-      /* Style pour les onglets */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: rgb(237, 225, 207);
-        border-radius: 5px 5px 0 0;
-        padding: 1rem 2rem;
-        font-weight: bold;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        color: white;
-    }
+        /* ========== STYLES EXISTANTS ========== */
+        /* Style pour les titres */
+        .title-container {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dashboard-title {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+            text-align: center;
+        }
+        
+        .dashboard-subtitle {
+            color: white;
+            font-size: 1.2rem;
+            margin: 0;
+            text-align: center;
+            opacity: 0.9;
+        }
+        
+        /* Style général des boutons */
+        .stButton > button {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 0.5rem 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Style pour les onglets */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background: rgb(237, 225, 207);
+            border-radius: 5px 5px 0 0;
+            padding: 1rem 2rem;
+            font-weight: bold;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* ========== STYLES SPÉCIFIQUES POUR LES 3 BOUTONS ========== */
+        /* Conteneur parent spécifique */
+        div[data-testid="column"].uniform-buttons {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 8px !important;
+        }
+        
+        /* Styles spécifiques pour les 3 boutons */
+        div[data-testid="column"].uniform-buttons div.stButton > button {
+            width: 100% !important;
+            min-width: 120px !important;
+            max-width: 200px !important;
+            padding: 10px 5px !important;
+            margin: 0 !important;
+            text-align: center !important;
+            flex-grow: 1 !important;
+            border-radius: 8px !important;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+            border: none !important;
+            cursor: pointer !important;
+        }
+        
+        /* État hover spécifique */
+        div[data-testid="column"].uniform-buttons div.stButton > button:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 def show():
@@ -667,7 +702,7 @@ def liste_factures():
             facture_id = next(f['id'] for f in factures 
                              if f"{f['numero_facture']} - {f.get('client_nom', 'N/A')} ({f['montant_ttc']:.2f} DH)" == selected_facture)
             
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3 = st.columns(3)
             
             with col1:
                 if st.button(" Voir Détails"):
@@ -679,12 +714,6 @@ def liste_factures():
                     st.rerun()
             
             with col3:
-                if st.button(" Marquer Payée"):
-                    if modifier_facture(facture_id, {'statut': 'Payée', 'date_paiement': str(datetime.now().date())}):
-                        st.success("✅ Facture marquée comme payée !")
-                        st.rerun()
-            
-            with col4:
                 if st.button(" Supprimer"):
                     if st.session_state.get('confirm_delete_facture') == facture_id:
                         if supprimer_facture(facture_id):

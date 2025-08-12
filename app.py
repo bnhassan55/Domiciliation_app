@@ -1,5 +1,5 @@
 import streamlit as st
-from login import login_page,clear_session
+from login import login_page, clear_session, is_logged_in
 from PIL import Image
 import os
 import sys
@@ -21,66 +21,60 @@ try:
 except Exception as e:
     st.error(f"Erreur d'initialisation de la base de données: {e}")
 
-# Initialisation session
-########## $$ #######################################################
+# =================== GESTION DE L'AUTHENTIFICATION ===================
 
+# CORRECTION : Initialisation et vérification de session intelligente
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-
-# Vérification en 2 étapes
-if not st.session_state.logged_in:
+    # Au premier chargement, vérifier s'il y a une session sauvegardée
     from login import load_session
     saved_username, saved_page = load_session()
-    if saved_username:
+    
+    if saved_username:  # Session valide trouvée
         st.session_state.update({
             'logged_in': True,
             'username': saved_username,
             'login_time': datetime.now(),
             'current_page': saved_page
         })
-    else:
-        login_page()
-        st.stop()
 
-if not st.session_state.logged_in:
-    # Masquer complètement la sidebar pendant la connexion
+# Vérification finale : si toujours pas connecté, afficher login
+if not st.session_state.get('logged_in', False):
+    # Masquer sidebar et header pour la page de login
     st.markdown("""
     <style>
-        section[data-testid="stSidebar"] {
-            display: none !important;
-        }
+        section[data-testid="stSidebar"] { display: none !important; }
+        header[data-testid="stHeader"] { display: none !important; }
+        .stApp > .block-container { padding-top: 0 !important; }
     </style>
     """, unsafe_allow_html=True)
     
     login_page()
     st.stop()
 
-######################### $$ #########################################
+# =================== APRÈS AUTHENTIFICATION RÉUSSIE ===================
 
-
-# Ajouter le dossier page au Python path de manière plus robuste
+# Ajouter le dossier page au Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 page_dir = os.path.join(current_dir, 'page')
 
 if page_dir not in sys.path:
     sys.path.insert(0, page_dir)
 
-# Fonction pour importer les modules de page avec gestion d'erreurs améliorée
+# Fonction pour importer les modules de page
 def import_page_module(module_name):
     """Importe un module de page avec gestion d'erreurs détaillée"""
     try:
-        # Méthode 1: Import direct depuis le dossier page
         module = __import__(module_name)
         return module
     except ImportError as e1:
         try:
-            # Méthode 2: Import avec le chemin complet
             import importlib.util
             module_path = os.path.join(page_dir, f"{module_name}.py")
             
             if not os.path.exists(module_path):
-                st.error(f" Fichier non trouvé: {module_path}")
-                st.info(f"📁 Vérifiez que le fichier `page/{module_name}.py` existe")
+                st.error(f"✗ Fichier non trouvé: {module_path}")
+                st.info(f" Vérifiez que le fichier `page/{module_name}.py` existe")
                 return None
             
             spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -89,11 +83,10 @@ def import_page_module(module_name):
             return module
             
         except Exception as e2:
-            st.error(f" Erreur d'importation pour {module_name}")
+            st.error(f"✗ Erreur d'importation pour {module_name}")
             st.error(f"Erreur 1: {e1}")
             st.error(f"Erreur 2: {e2}")
             
-            # Debug: Afficher les informations sur les fichiers
             with st.expander(" Informations de débogage"):
                 st.write(f"**Répertoire courant:** {current_dir}")
                 st.write(f"**Dossier page:** {page_dir}")
@@ -109,56 +102,38 @@ def import_page_module(module_name):
                     except Exception as e:
                         st.write(f"Erreur lecture dossier: {e}")
                 else:
-                    st.write(" Le dossier 'page' n'existe pas!")
+                    st.write("✗ Le dossier 'page' n'existe pas!")
             
             return None
 
-# =================== APRÈS AUTHENTIFICATION ===================
-
-# Styles CSS pour l'interface avec navigation améliorée
-# Styles CSS pour l'interface avec navigation améliorée
+# Styles CSS pour l'interface
 st.markdown("""
 <style>
-
-    /* Import Font Awesome */
     @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
     
-    /* Couleur de fond de la sidebar */
     [data-testid="stSidebar"] > div:first-child {
-        ba
-        ckground-color: rgb(237, 225, 207) !important;
+        background-color: rgb(237, 225, 207) !important;
     }
     
-    /* Masquer complètement l'en-tête Streamlit */
-            
     header[data-testid="stHeader"] {
         display: none !important;
     }
     
-    /* Supprimer les marges par défaut */
     .main .block-container {
         padding-top: 0 !important;
         margin-top: 0 !important;
     }
     
-    /* Masquer le menu Streamlit */
     #MainMenu {visibility: hidden;}
-    
-    /* Masquer le footer */
     footer {visibility: hidden;}
-    
-    /* Masquer le bouton "Made with Streamlit" */
     .stApp > footer {visibility: hidden;}
     .stApp > header {visibility: hidden;}
-            
 
-    /* Structure générale */
     .sidebar-content {
         padding: 1rem;
         background-color: transparent !important;
     }
     
-    /* Logo et titre */
     .logo-container {
         text-align: center;
         padding: 1rem 0;
@@ -177,7 +152,6 @@ st.markdown("""
         text-transform: uppercase;
     }
     
-    /* Menu de navigation */
     .menu-item {
         display: flex;
         align-items: center;
@@ -210,7 +184,6 @@ st.markdown("""
         font-size: 1.1rem;
     }
     
-    /* Boutons Streamlit personnalisés */
     .stButton > button {
         width: 100%;
         padding: 12px 16px;
@@ -229,7 +202,6 @@ st.markdown("""
         transform: translateX(2px);
     }
     
-    /* Section utilisateur */
     .user-section {
         margin-top: 2rem;
         padding-top: 1rem;
@@ -237,7 +209,6 @@ st.markdown("""
         background-color: transparent !important;
     }
     
-    /* Bouton déconnexion */
     .logout-btn {
         background-color: rgba(255, 255, 255, 0.7) !important;
         color: #e74c3c;
@@ -254,7 +225,6 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Contenu principal */
     .page-title {
         color: #333;
         font-size: 2rem;
@@ -263,31 +233,27 @@ st.markdown("""
         padding-bottom: 0.5rem;
         border-bottom: 2px solid #667eea;
     }
-    
 
-    /* Masquer la flèche de masquage/affichage */
     button[data-testid="collapsedControl"] {
-    display: none !important;
+        display: none !important;
     }
 
-    /* Masquer tous les contrôles de sidebar */
     section[data-testid="stSidebar"] button[kind="header"],
     [data-testid="stSidebarCollapseButton"] {
         display: none !important;
     }
-
 </style>
 """, unsafe_allow_html=True)
+
 # Initialisation de la page courante
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "Accueil"
 
 # Sidebar avec navigation
 with st.sidebar:
-    # Logo en haut
     st.markdown('<div class="logo-container">', unsafe_allow_html=True)
     
-    # Gestion du logo avec chemin relatif
+    # Gestion du logo
     logo_path = os.path.join("static", "logo.jpg")
     if os.path.exists(logo_path):
         try:
@@ -300,7 +266,7 @@ with st.sidebar:
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Menu de navigation avec boutons
+    # Menu de navigation
     st.markdown('<div class="company-title"><i>Navigation</i></div>', unsafe_allow_html=True)
 
     # Options de menu
@@ -318,7 +284,7 @@ with st.sidebar:
         with col2:
             if st.button(display_name, key=f"nav_{page_name}", use_container_width=True):
                 st.session_state.current_page = page_name
-                # Sauvegarder aussi dans la session persistante
+                # Sauvegarder la page courante
                 if st.session_state.get('logged_in'):
                     from login import save_session
                     save_session(st.session_state.username, page_name)
@@ -330,67 +296,65 @@ with st.sidebar:
     # Informations utilisateur
     st.markdown('<div class="user-section">', unsafe_allow_html=True)
     st.markdown("### <i class='fas fa-user-circle'></i> Utilisateur", unsafe_allow_html=True)
-    st.success("Session active")
+    st.success(f"✅ {st.session_state.get('username', 'Utilisateur')} connecté")
     
-    # Bouton de déconnexion en bas
+    # Bouton de déconnexion
     st.markdown("<br>" * 5, unsafe_allow_html=True)
     if st.button(" Déconnexion", key="logout_btn", use_container_width=True):
         from login import logout_user
         with st.spinner("Déconnexion en cours..."):
-            logout_user()  # Cette fonction fera le rerun nécessaire
-#===================================+==============================+=======================================+============#
-#===================================+==============================+=======================================+============#
+            logout_user()
+
 # Container principal
 main_container = st.container()
 
 with main_container:
     try:
-        # Récupérer la page courante
         page_name = st.session_state.current_page
         
-        # Routage vers les différentes pages sans afficher le titre
+        # Routage vers les différentes pages
         if page_name == "Accueil":
             module = import_page_module("Accueil")
             if module and hasattr(module, 'show'):
                 module.show()
             else:
-                st.error(" Module Accueil non trouvé ou fonction show() manquante")
-                st.info(" Créez le fichier `page/Accueil.py` avec une fonction `show()`")
+                st.error("✗ Module Accueil non trouvé ou fonction show() manquante")
+                st.info("💡 Créez le fichier `page/Accueil.py` avec une fonction `show()`")
                 
         elif page_name == "Clients":
             module = import_page_module("Clients")
             if module and hasattr(module, 'show'):
                 module.show()
             else:
-                st.error(" Module Clients non trouvé ou fonction show() manquante")
-                st.info(" Créez le fichier `page/Clients.py` avec une fonction `show()`")
+                st.error("✗ Module Clients non trouvé ou fonction show() manquante")
+                st.info("💡 Créez le fichier `page/Clients.py` avec une fonction `show()`")
                 
         elif page_name == "Contrats":
             module = import_page_module("Contrats")
             if module and hasattr(module, 'show'):
                 module.show()
             else:
-                st.error(" Module Contrats non trouvé ou fonction show() manquante")
-                st.info(" Créez le fichier `page/Contrats.py` avec une fonction `show()`")
+                st.error("✗ Module Contrats non trouvé ou fonction show() manquante")
+                st.info("💡 Créez le fichier `page/Contrats.py` avec une fonction `show()`")
                 
         elif page_name == "Facturation":
             module = import_page_module("Facturation")
             if module and hasattr(module, 'show'):
                 module.show()
             else:
-                st.error(" Module Facturation non trouvé ou fonction show() manquante")
-                st.info(" Créez le fichier `page/Facturation.py` avec une fonction `show()`")
+                st.error("✗ Module Facturation non trouvé ou fonction show() manquante")
+                st.info("💡 Créez le fichier `page/Facturation.py` avec une fonction `show()`")
                 
         elif page_name == "Reporting":
             module = import_page_module("Reporting")
             if module and hasattr(module, 'show'):
                 module.show()
             else:
-                st.error(" Module Reporting non trouvé ou fonction show() manquante")
-                st.info(" Créez le fichier `page/Reporting.py` avec une fonction `show()`")
+                st.error("✗ Module Reporting non trouvé ou fonction show() manquante")
+                st.info("💡 Créez le fichier `page/Reporting.py` avec une fonction `show()`")
         
     except Exception as e:
-        st.error(f" Erreur lors du chargement de la page {page_name}: {e}")
+        st.error(f"✗ Erreur lors du chargement de la page {page_name}: {e}")
         
         with st.expander(" Détails de l'erreur"):
             import traceback
