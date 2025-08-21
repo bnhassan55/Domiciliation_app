@@ -1,8 +1,3 @@
-"""
-Module utilitaire pour l'application de domiciliation
-Contient les fonctions d'aide et de formatage
-"""
-
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
