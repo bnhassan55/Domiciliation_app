@@ -807,6 +807,9 @@ def show_delete_confirmation_enhanced(client_data, type_client):
         st.warning(f"⚠️ Impossible de vérifier les éléments associés: {str(e)}")
     
     # Interface de confirmation sécurisée
+    # st.markdown("### 🔐 Confirmation Sécurisée")
+    
+   
     
     # Boutons d'action finaux
     col1, col2 = st.columns(2)
@@ -814,27 +817,26 @@ def show_delete_confirmation_enhanced(client_data, type_client):
     with col1:
         if st.button("✅ CONFIRMER LA SUPPRESSION", 
                     use_container_width=True,
-                    type="primary",
-                    disabled=not confirmation_valide):
+                    type="primary"):
             
-            if confirmation_valide:
-                with st.spinner(" Suppression en cours..."):
-                    success = supprimer_client_definitif(client_data['id'])
+            
+            with st.spinner(" Suppression en cours..."):
+                success = supprimer_client_definitif(client_data['id'])
                     
-                    if success:
-                        st.success("✅ Client supprimé avec succès !")
+                if success:
+                    st.success("✅ Client supprimé avec succès !")
                     
                         
                         # Nettoyer l'état
-                        if 'editing_client_id' in st.session_state:
-                            del st.session_state['editing_client_id']
-                        if 'editing_client_type' in st.session_state:
-                            del st.session_state['editing_client_type']
+                    if 'editing_client_id' in st.session_state:
+                        del st.session_state['editing_client_id']
+                    if 'editing_client_type' in st.session_state:
+                        del st.session_state['editing_client_type']
                         
-                        time.sleep(2)
-                        st.rerun()
-                    else:
-                        st.error("✗ Erreur lors de la suppression")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("✗ Erreur lors de la suppression")
     
     with col2:
         if st.button(" Annuler", use_container_width=True):
