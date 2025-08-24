@@ -807,21 +807,6 @@ def show_delete_confirmation_enhanced(client_data, type_client):
         st.warning(f"⚠️ Impossible de vérifier les éléments associés: {str(e)}")
     
     # Interface de confirmation sécurisée
-    # st.markdown("### 🔐 Confirmation Sécurisée")
-    
-    confirmation_text = "SUPPRIMER"
-    user_confirmation = st.text_input(
-        f"Tapez **{confirmation_text}** pour confirmer:",
-        placeholder=confirmation_text,
-        help="Cette vérification évite les suppressions accidentelles"
-    )
-    
-    confirmation_valide = user_confirmation.upper() == confirmation_text
-    
-    if confirmation_valide:
-        st.success("✅ Confirmation validée")
-    elif user_confirmation:
-        st.error("✗ Texte de confirmation incorrect")
     
     # Boutons d'action finaux
     col1, col2 = st.columns(2)
