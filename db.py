@@ -672,42 +672,92 @@ def modifier_client(client_id: int, client_data: Dict, client_type: str) -> bool
 def modifier_client_fixed(client_id: int, client_data: dict, client_type: str) -> bool:
     """Version de compatibilité - utilise la nouvelle fonction"""
     return modifier_client_complet(client_id, client_data, client_type)
+def get_next_client_id():
+    """Générer un ID unique pour tous les clients (physiques et moraux)"""
+    try:
+        conn = get_db_connection()
+        
+        # Récupérer l'ID max des clients physiques
+        max_physique = conn.execute(
+            "SELECT MAX(id) as max_id FROM clients_physiques"
+        ).fetchone()
+        max_id_physique = max_physique['max_id'] if max_physique['max_id'] else 0
+        
+        # Récupérer l'ID max des clients moraux
+        max_moral = conn.execute(
+            "SELECT MAX(id) as max_id FROM clients_moraux"
+        ).fetchone()
+        max_id_moral = max_moral['max_id'] if max_moral['max_id'] else 0
+        
+        # Retourner le maximum + 1
+        next_id = max(max_id_physique, max_id_moral) + 1
+        conn.close()
+        return next_id
+        
+    except Exception as e:
+        print(f"Erreur génération ID: {e}")
+        return None
 
 # Fonctions CRUD Clients (inchangées mais améliorées)
-def ajouter_client(client_data: Dict, client_type: str) -> bool:
-    """Ajoute un nouveau client"""
-    conn = get_db_connection()
+def ajouter_client(client_data, type_client):
+    """Ajouter un client avec ID unique"""
     try:
-        table = "clients_physiques" if client_type == "physique" else "clients_moraux"
+        conn = get_db_connection()
         
-        # Validation des champs requis
-        if client_type == "physique":
-            required_fields = ['nom', 'prenom', 'cin', 'telephone']
-        else:
-            required_fields = ['raison_sociale', 'ice', 'telephone']
+        # Générer un ID unique
+        new_id = get_next_client_id()
+        if not new_id:
+            return False
+            
+        if type_client == "physique":
+            query = """
+                INSERT INTO clients_physiques 
+                (id, nom, prenom, cin, telephone, sexe, email, date_naissance, adresse, date_creation)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            values = (
+                new_id,
+                client_data.get('nom'),
+                client_data.get('prenom'),
+                client_data.get('cin'),
+                client_data.get('telephone'),
+                client_data.get('sexe', ''),
+                client_data.get('email', ''),
+                client_data.get('date_naissance', ''),
+                client_data.get('adresse', ''),
+                datetime.now().isoformat()
+            )
+        else:  # moral
+            query = """
+                INSERT INTO clients_moraux 
+                (id, raison_sociale, ice, rc, forme_juridique, telephone, email, adresse,
+                 rep_nom, rep_prenom, rep_cin, rep_qualite, date_creation)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            values = (
+                new_id,
+                client_data.get('raison_sociale'),
+                client_data.get('ice'),
+                client_data.get('rc', ''),
+                client_data.get('forme_juridique', ''),
+                client_data.get('telephone'),
+                client_data.get('email', ''),
+                client_data.get('adresse', ''),
+                client_data.get('rep_nom', ''),
+                client_data.get('rep_prenom', ''),
+                client_data.get('rep_cin', ''),
+                client_data.get('rep_qualite', ''),
+                datetime.now().isoformat()
+            )
         
-        for field in required_fields:
-            if not client_data.get(field):
-                return False
-        
-        columns = ", ".join(client_data.keys())
-        placeholders = ", ".join(["?"] * len(client_data))
-        
-        conn.execute(
-            f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
-            tuple(client_data.values())
-        )
+        conn.execute(query, values)
         conn.commit()
-        
+        conn.close()
         return True
-         
-    except sqlite3.IntegrityError:
-        return False
+        
     except Exception as e:
         print(f"Erreur ajout client: {e}")
         return False
-    finally:
-        conn.close()
 
 def rechercher_clients(search_term: str = "", client_type: Optional[str] = None) -> List[Dict]:
     """Recherche des clients"""
@@ -1846,6 +1896,94 @@ def nettoyer_donnees_orphelines():
     finally:
         conn.close()
 
+def migrate_existing_data():
+    """Migrer les données existantes pour ajouter client_type"""
+    try:
+        conn = get_db_connection()
+        
+        # Mettre à jour les contrats existants sans client_type
+        conn.execute("""
+            UPDATE contrats 
+            SET client_type = 'physique' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_physiques)
+        """)
+        
+        conn.execute("""
+            UPDATE contrats 
+            SET client_type = 'moral' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_moraux)
+        """)
+        
+        # Même chose pour les factures
+        conn.execute("""
+            UPDATE factures 
+            SET client_type = 'physique' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_physiques)
+        """)
+        
+        conn.execute("""
+            UPDATE factures 
+            SET client_type = 'moral' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_moraux)
+        """)
+        
+        conn.commit()
+        conn.close()
+        
+        print("Migration des données terminée avec succès")
+        return True
+        
+    except Exception as e:
+        print(f"Erreur migration: {e}")
+        return False
+def migrate_existing_data():
+    """Migrer les données existantes pour ajouter client_type"""
+    try:
+        conn = get_db_connection()
+        
+        # Mettre à jour les contrats existants sans client_type
+        conn.execute("""
+            UPDATE contrats 
+            SET client_type = 'physique' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_physiques)
+        """)
+        
+        conn.execute("""
+            UPDATE contrats 
+            SET client_type = 'moral' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_moraux)
+        """)
+        
+        # Même chose pour les factures
+        conn.execute("""
+            UPDATE factures 
+            SET client_type = 'physique' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_physiques)
+        """)
+        
+        conn.execute("""
+            UPDATE factures 
+            SET client_type = 'moral' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_moraux)
+        """)
+        
+        conn.commit()
+        conn.close()
+        
+        print("Migration des données terminée avec succès")
+        return True
+        
+    except Exception as e:
+        print(f"Erreur migration: {e}")
+        return False
 if __name__ == "__main__":
     init_db()
     print("Base de données initialisée avec succès!")
