@@ -1984,8 +1984,365 @@ def migrate_existing_data():
     except Exception as e:
         print(f"Erreur migration: {e}")
         return False
+    
+# SOLUTION 1: Modifier la structure de la base de données pour éviter les conflits d'ID
+
+def update_db_structure_with_client_type():
+    """
+    Met à jour la structure de la base de données pour inclure client_type
+    dans toutes les tables de liaison
+    """
+    conn = get_db_connection()
+    
+    try:
+        # 1. Ajouter client_type à la table factures si elle n'existe pas
+        try:
+            conn.execute("ALTER TABLE factures ADD COLUMN client_type TEXT CHECK(client_type IN ('physique', 'moral'))")
+            print("Colonne client_type ajoutée à la table factures")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e):
+                print(f"Erreur ajout colonne client_type à factures: {e}")
+        
+        # 2. Mettre à jour les factures existantes pour définir le client_type
+        # Identifier les factures liées aux clients physiques
+        conn.execute("""
+            UPDATE factures 
+            SET client_type = 'physique' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_physiques)
+        """)
+        
+        # Identifier les factures liées aux clients moraux
+        conn.execute("""
+            UPDATE factures 
+            SET client_type = 'moral' 
+            WHERE client_type IS NULL 
+            AND client_id IN (SELECT id FROM clients_moraux)
+        """)
+        
+        # 3. Créer un index composite pour améliorer les performances
+        try:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_factures_client_composite ON factures(client_id, client_type)")
+            print("Index composites créés")
+        except Exception as e:
+            print(f"Erreur création index: {e}")
+        
+        conn.commit()
+        print("Mise à jour de la structure terminée avec succès")
+        
+    except Exception as e:
+        print(f"Erreur mise à jour structure: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+# SOLUTION 2: Fonction pour obtenir les informations d'un client de manière sécurisée
+
+def get_client_info(client_id: int, client_type: str) -> dict:
+    """
+    Récupère les informations d'un client spécifique selon son type
+    
+    Args:
+        client_id: ID du client
+        client_type: Type du client ('physique' ou 'moral')
+    
+    Returns:
+        dict: Informations du client ou None si non trouvé
+    """
+    conn = get_db_connection()
+    try:
+        if client_type == 'physique':
+            cursor = conn.execute("""
+                SELECT id, nom || ' ' || prenom as nom_complet, 
+                       nom, prenom, cin as identifiant, telephone, email, adresse,
+                       'physique' as type_client
+                FROM clients_physiques 
+                WHERE id = ?
+            """, (client_id,))
+        else:  # moral
+            cursor = conn.execute("""
+                SELECT id, raison_sociale as nom_complet, 
+                       raison_sociale, ice as identifiant, telephone, email, adresse,
+                       rep_nom, rep_prenom, rep_cin, rep_qualite,
+                       'moral' as type_client
+                FROM clients_moraux 
+                WHERE id = ?
+            """, (client_id,))
+        
+        row = cursor.fetchone()
+        return dict(row) if row else None
+        
+    except Exception as e:
+        print(f"Erreur récupération client: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+# SOLUTION 3: Fonction corrigée pour ajouter une facture avec validation
+
+def ajouter_facture_corrigee(facture_data: Dict) -> bool:
+    """
+    Ajoute une nouvelle facture avec validation stricte du client
+    """
+    conn = get_db_connection()
+    try:
+        # VALIDATION 1: Vérifier que le client existe dans la bonne table
+        client_id = facture_data['client_id']
+        client_type = facture_data.get('client_type', 'physique')  # défaut physique si non spécifié
+        
+        client_info = get_client_info(client_id, client_type)
+        if not client_info:
+            print(f"Erreur: Client {client_id} de type {client_type} non trouvé")
+            return False
+        
+        # VALIDATION 2: Si un contrat est spécifié, vérifier sa cohérence
+        contrat_id = facture_data.get('contrat_id')
+        if contrat_id:
+            cursor = conn.execute("""
+                SELECT client_id, client_type FROM contrats 
+                WHERE id = ?
+            """, (contrat_id,))
+            contrat = cursor.fetchone()
+            
+            if not contrat:
+                print(f"Erreur: Contrat {contrat_id} non trouvé")
+                return False
+            
+            if contrat['client_id'] != client_id or contrat['client_type'] != client_type:
+                print(f"Erreur: Contrat {contrat_id} n'appartient pas au client {client_id} de type {client_type}")
+                return False
+        
+        # VALIDATION 3: Vérifier l'unicité du numéro de facture
+        cursor = conn.execute("SELECT id FROM factures WHERE numero_facture = ?", 
+                             (facture_data['numero_facture'],))
+        if cursor.fetchone():
+            print(f"Erreur: Numéro de facture déjà existant: {facture_data['numero_facture']}")
+            return False
+        
+        # AJOUT DE LA FACTURE avec client_type obligatoire
+        conn.execute("""
+        INSERT INTO factures (
+            numero_facture, contrat_id, client_id, client_type, type_facture,
+            date_facture, date_echeance, periode_debut, periode_fin,
+            montant_ht, taux_tva, montant_tva, montant_ttc,
+            description, mode_reglement, statut, date_creation
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            facture_data['numero_facture'],
+            facture_data.get('contrat_id'),
+            facture_data['client_id'],
+            client_type,  # OBLIGATOIRE maintenant
+            facture_data['type_facture'],
+            facture_data['date_facture'],
+            facture_data['date_echeance'],
+            facture_data.get('periode_debut'),
+            facture_data.get('periode_fin'),
+            facture_data['montant_ht'],
+            facture_data['taux_tva'],
+            facture_data['montant_tva'],
+            facture_data['montant_ttc'],
+            facture_data.get('description'),
+            facture_data['mode_reglement'],
+            facture_data['statut'],
+            facture_data['date_creation']
+        ))
+        
+        conn.commit()
+        print(f"Facture créée avec succès pour client {client_id} ({client_type}): {client_info['nom_complet']}")
+        return True
+        
+    except sqlite3.IntegrityError as e:
+        print(f"Erreur d'intégrité lors de l'ajout de la facture: {e}")
+        return False
+    except Exception as e:
+        print(f"Erreur ajout facture: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+# SOLUTION 4: Fonction corrigée pour récupérer toutes les factures
+
+def get_all_factures_corrigee():
+    """
+    Récupère toutes les factures avec les noms corrects selon le type de client
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Requête avec jointure conditionnelle basée sur client_type
+        cursor.execute("""
+            SELECT f.*, 
+                   CASE 
+                       WHEN f.client_type = 'physique' THEN cp.nom || ' ' || cp.prenom
+                       WHEN f.client_type = 'moral' THEN cm.raison_sociale
+                       ELSE 'Client inconnu'
+                   END as client_nom,
+                   CASE 
+                       WHEN f.client_type = 'physique' THEN cp.cin
+                       WHEN f.client_type = 'moral' THEN cm.ice
+                       ELSE NULL
+                   END as client_identifiant,
+                   CASE 
+                       WHEN f.client_type = 'physique' THEN cp.telephone
+                       WHEN f.client_type = 'moral' THEN cm.telephone
+                       ELSE NULL
+                   END as client_telephone
+            FROM factures f
+            LEFT JOIN clients_physiques cp ON f.client_id = cp.id AND f.client_type = 'physique'
+            LEFT JOIN clients_moraux cm ON f.client_id = cm.id AND f.client_type = 'moral'
+            ORDER BY f.date_facture DESC
+        """)
+        
+        factures = []
+        for row in cursor.fetchall():
+            facture_dict = dict(row)
+            # Ajouter une vérification de cohérence
+            if not facture_dict['client_nom'] or facture_dict['client_nom'] == 'Client inconnu':
+                print(f"ATTENTION: Facture {facture_dict['numero_facture']} - Client introuvable (ID: {facture_dict['client_id']}, Type: {facture_dict['client_type']})")
+            factures.append(facture_dict)
+        
+        conn.close()
+        return factures
+    except Exception as e:
+        print(f"Erreur lors de la récupération des factures: {e}")
+        return []
+
+
+# SOLUTION 5: Fonction pour nettoyer les données incohérentes
+
+def nettoyer_factures_incoherentes():
+    """
+    Nettoie les factures qui pointent vers des clients inexistants
+    """
+    conn = get_db_connection()
+    try:
+        print("Nettoyage des factures incohérentes...")
+        
+        # Identifier les factures avec des clients inexistants
+        cursor = conn.execute("""
+            SELECT f.id, f.numero_facture, f.client_id, f.client_type
+            FROM factures f
+            LEFT JOIN clients_physiques cp ON f.client_id = cp.id AND f.client_type = 'physique'
+            LEFT JOIN clients_moraux cm ON f.client_id = cm.id AND f.client_type = 'moral'
+            WHERE cp.id IS NULL AND cm.id IS NULL
+        """)
+        
+        factures_orphelines = cursor.fetchall()
+        
+        if factures_orphelines:
+            print(f"Trouvé {len(factures_orphelines)} factures orphelines:")
+            for facture in factures_orphelines:
+                print(f"  - Facture {facture['numero_facture']}: Client ID {facture['client_id']} (type: {facture['client_type']}) introuvable")
+            
+            # Demander confirmation avant suppression
+            print("Ces factures seront supprimées car elles pointent vers des clients inexistants")
+            
+            # Supprimer les factures orphelines
+            for facture in factures_orphelines:
+                conn.execute("DELETE FROM factures WHERE id = ?", (facture['id'],))
+            
+            conn.commit()
+            print(f"{len(factures_orphelines)} factures orphelines supprimées")
+        else:
+            print("Aucune facture orpheline trouvée")
+            
+    except Exception as e:
+        print(f"Erreur lors du nettoyage: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+
+# SOLUTION 6: Fonction de diagnostic pour identifier les problèmes
+
+def diagnostiquer_conflits_clients():
+    """
+    Diagnostic des conflits d'IDs entre clients physiques et moraux
+    """
+    conn = get_db_connection()
+    try:
+        print("=== DIAGNOSTIC DES CONFLITS D'IDS ===")
+        
+        # 1. Identifier les IDs en conflit
+        cursor = conn.execute("""
+            SELECT cp.id, cp.nom || ' ' || cp.prenom as nom_physique,
+                   cm.raison_sociale as nom_moral
+            FROM clients_physiques cp
+            INNER JOIN clients_moraux cm ON cp.id = cm.id
+            ORDER BY cp.id
+        """)
+        
+        conflits = cursor.fetchall()
+        
+        if conflits:
+            print(f"ATTENTION: {len(conflits)} IDs en conflit trouvés:")
+            for conflit in conflits:
+                print(f"  ID {conflit['id']}: '{conflit['nom_physique']}' (physique) vs '{conflit['nom_moral']}' (moral)")
+        else:
+            print("Aucun conflit d'ID détecté")
+        
+        # 2. Vérifier les factures problématiques
+        cursor = conn.execute("""
+            SELECT f.numero_facture, f.client_id, f.client_type,
+                   cp.nom || ' ' || cp.prenom as nom_physique,
+                   cm.raison_sociale as nom_moral
+            FROM factures f
+            LEFT JOIN clients_physiques cp ON f.client_id = cp.id
+            LEFT JOIN clients_moraux cm ON f.client_id = cm.id
+            WHERE cp.id IS NOT NULL AND cm.id IS NOT NULL
+            ORDER BY f.client_id
+        """)
+        
+        factures_ambigues = cursor.fetchall()
+        
+        if factures_ambigues:
+            print(f"\nFACTURES POTENTIELLEMENT AMBIGUES: {len(factures_ambigues)}")
+            for facture in factures_ambigues:
+                print(f"  Facture {facture['numero_facture']}: ID {facture['client_id']} (type: {facture.get('client_type', 'NON DEFINI')})")
+                print(f"    - Client physique possible: {facture['nom_physique']}")
+                print(f"    - Client moral possible: {facture['nom_moral']}")
+        
+        print("=== FIN DIAGNOSTIC ===")
+        
+    except Exception as e:
+        print(f"Erreur lors du diagnostic: {e}")
+    finally:
+        conn.close()
+
+
+# FONCTION PRINCIPALE À EXÉCUTER POUR RÉSOUDRE LE PROBLÈME
+def resoudre_probleme_ids_clients():
+    """
+    Fonction principale pour résoudre le problème des IDs clients
+    """
+    print("=== RÉSOLUTION DU PROBLÈME DES IDS CLIENTS ===")
+    
+    # Étape 1: Diagnostic
+    print("\n1. Diagnostic des conflits...")
+    diagnostiquer_conflits_clients()
+    
+    # Étape 2: Mise à jour de la structure
+    print("\n2. Mise à jour de la structure de la base de données...")
+    update_db_structure_with_client_type()
+    
+    # Étape 3: Nettoyage des données incohérentes
+    print("\n3. Nettoyage des données incohérentes...")
+    nettoyer_factures_incoherentes()
+    
+    print("\n=== RÉSOLUTION TERMINÉE ===")
+    print("Utilisez désormais ajouter_facture_corrigee() et get_all_factures_corrigee()")
+
+
+if __name__ == "__main__":
+    # Exécuter la résolution
+    resoudre_probleme_ids_clients()
 if __name__ == "__main__":
     init_db()
     print("Base de données initialisée avec succès!")
     debug_database()
     nettoyer_donnees_orphelines()
+    resoudre_probleme_ids_clients()

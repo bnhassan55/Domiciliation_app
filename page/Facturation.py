@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, date
 from db import (get_all_contrats, ajouter_facture, get_all_factures, 
-                modifier_facture, supprimer_facture, get_facture_by_id)
+                modifier_facture, supprimer_facture, get_facture_by_id,update_db_structure_with_client_type,
+                get_client_info,get_all_factures_corrigee,ajouter_facture_corrigee
+                )
 import uuid
 
 def apply_dashboard_css():
@@ -104,7 +106,13 @@ def apply_dashboard_css():
     """, unsafe_allow_html=True)
 def show():
     apply_dashboard_css()
-    
+    if 'db_structure_updated' not in st.session_state:
+        with st.spinner("Vérification de la base de données..."):
+            try:
+                update_db_structure_with_client_type()
+                st.session_state.db_structure_updated = True
+            except Exception as e:
+                st.error(f"Erreur lors de la mise à jour de la base de données: {e}")    
     # Titre avec HTML personnalisé
     st.markdown("""
     <div class="title-container">
@@ -283,30 +291,30 @@ def nouvelle_facture():
             else:
                 # Préparer les données de la facture
                 facture_data = {
-                    'numero_facture': numero_facture.strip(),
-                    'contrat_id': contrat['id'],
-                    'client_id': contrat['client_id'],
-                    'type_facture': type_facture,
-                    'date_facture': str(date_facture),
-                    'date_echeance': str(date_echeance),
-                    'periode_debut': str(periode_debut),
-                    'periode_fin': str(periode_fin),
-                    'montant_ht': montant_ht,
-                    'taux_tva': taux_tva,
-                    'montant_tva': montant_tva,
-                    'montant_ttc': montant_ttc,
-                    'description': description.strip() if description else None,
-                    'mode_reglement': mode_reglement,
-                    'statut': 'En attente',
-                    'date_creation': str(datetime.now().date())
-                }
-                
-                if ajouter_facture(facture_data):
+                                'numero_facture': numero_facture.strip(),
+                                'contrat_id': contrat['id'],
+                                'client_id': contrat['client_id'],
+                                'client_type': contrat['client_type'],  # ← AJOUT OBLIGATOIRE
+                                'type_facture': type_facture,
+                                'date_facture': str(date_facture),
+                                'date_echeance': str(date_echeance),
+                                'periode_debut': str(periode_debut),
+                                'periode_fin': str(periode_fin),
+                                'montant_ht': montant_ht,
+                                'taux_tva': taux_tva,
+                                'montant_tva': montant_tva,
+                                'montant_ttc': montant_ttc,
+                                'description': description.strip() if description else None,
+                                'mode_reglement': mode_reglement,
+                                'statut': 'En attente',
+                                'date_creation': str(datetime.now().date())
+                            }
+                if ajouter_facture_corrigee(facture_data):  # ← CHANGEMENT ICI
                     st.success("✅ Facture créée avec succès !")
                     st.balloons()
                     st.rerun()
                 else:
-                    st.error(" Erreur lors de la création de la facture")
+                    st.error("❌ Erreur lors de la création de la facture")
 
 def modifier_facture_interface(facture_id):
     """Interface complète de modification d'une facture avec tous les champs modifiables"""
@@ -612,7 +620,7 @@ def liste_factures():
         )
     
     # Récupérer les factures
-    factures = get_all_factures()
+    factures = get_all_factures_corrigee()
     
     if not factures:
         st.info("Aucune facture enregistrée")
@@ -733,7 +741,7 @@ def tableau_bord_facturation():
     st.subheader("Tableau de Bord Facturation")
     
     # Récupérer toutes les factures
-    factures = get_all_factures()
+    factures = get_all_factures_corrigee()
     
     if not factures:
         st.info("Aucune donnée de facturation disponible")
@@ -849,16 +857,84 @@ def tableau_bord_facturation():
                 st.write(f"• {facture['numero_facture']} - {facture['date_echeance']}")
         else:
             st.info("🗋 Aucune échéance proche")
+    ajouter_diagnostic_factures()    
     
-
+def ajouter_diagnostic_factures():
+    """Ajouter un bouton de diagnostic dans le tableau de bord"""
+    st.markdown("---")
+    st.markdown("### 🔧 Outils de Diagnostic")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🔍 Diagnostiquer Conflits"):
+            with st.spinner("Diagnostic en cours..."):
+                # Capture les messages de diagnostic
+                import io
+                import sys
+                
+                old_stdout = sys.stdout
+                sys.stdout = buffer = io.StringIO()
+                
+                try:
+                    diagnostiquer_conflits_clients()
+                    diagnostic_output = buffer.getvalue()
+                    
+                    if diagnostic_output:
+                        st.code(diagnostic_output, language="text")
+                    else:
+                        st.success("Aucun problème détecté")
+                        
+                except Exception as e:
+                    st.error(f"Erreur lors du diagnostic: {e}")
+                finally:
+                    sys.stdout = old_stdout
+    
+    with col2:
+        if st.button("🧹 Nettoyer Données"):
+            with st.spinner("Nettoyage en cours..."):
+                try:
+                    nettoyer_factures_incoherentes()
+                    st.success("Nettoyage terminé")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur lors du nettoyage: {e}")
+    
+    with col3:
+        if st.button("📊 Statistiques DB"):
+            conn = get_db_connection()
+            try:
+                # Statistiques rapides
+                stats = conn.execute("""
+                    SELECT 
+                        (SELECT COUNT(*) FROM clients_physiques) as clients_physiques,
+                        (SELECT COUNT(*) FROM clients_moraux) as clients_moraux,
+                        (SELECT COUNT(*) FROM factures WHERE client_type = 'physique') as factures_physiques,
+                        (SELECT COUNT(*) FROM factures WHERE client_type = 'moral') as factures_morales,
+                        (SELECT COUNT(*) FROM factures WHERE client_type IS NULL) as factures_sans_type
+                """).fetchone()
+                
+                st.write("**Statistiques de la base:**")
+                st.write(f"- Clients physiques: {stats['clients_physiques']}")
+                st.write(f"- Clients moraux: {stats['clients_moraux']}")
+                st.write(f"- Factures physiques: {stats['factures_physiques']}")
+                st.write(f"- Factures morales: {stats['factures_morales']}")
+                if stats['factures_sans_type'] > 0:
+                    st.warning(f"- ⚠️ Factures sans type: {stats['factures_sans_type']}")
+                
+            except Exception as e:
+                st.error(f"Erreur statistiques: {e}")
+            finally:
+                conn.close()
 def voir_details_facture(facture_id):
     """Afficher les détails complets d'une facture"""
     facture = get_facture_by_id(facture_id)
-    
+
     if not facture:
         st.error("Facture non trouvée")
         return
-    
+    if not facture.get('client_type'):
+        st.warning("⚠️ Cette facture n'a pas de type de client défini. Données possiblement incohérentes.")
     with st.expander(f"🗎 Détails de la Facture {facture['numero_facture']}", expanded=True):
         col1, col2 = st.columns(2)
         
