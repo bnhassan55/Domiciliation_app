@@ -24,7 +24,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT NOT NULL,
             prenom TEXT NOT NULL,
-            sexe TEXT CHECK(sexe IN ('M', 'F', 'Autre')),
+            sexe TEXT CHECK(sexe IN ('M', 'F')),
             cin TEXT UNIQUE NOT NULL,
             telephone TEXT NOT NULL,
             email TEXT,

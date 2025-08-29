@@ -1415,7 +1415,7 @@ def export_clients_pdf():
                 clients_moraux = safe_get_clients("moral")
                 
                 if clients_physiques or clients_moraux:
-                    # Créer un rapport combiné
+                    # Créer un rapport combiné AVEC LES TABLEAUX
                     buffer = io.BytesIO()
                     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
                     
@@ -1426,7 +1426,15 @@ def export_clients_pdf():
                         fontSize=20,
                         spaceAfter=30,
                         alignment=1,
-                        textColor=colors.HexColor('#667eea')
+                        textColor=colors.HexColor("#931214")
+                    )
+                    
+                    subtitle_style = ParagraphStyle(
+                        'SubTitle',
+                        parent=styles['Heading2'],
+                        fontSize=16,
+                        spaceAfter=20,
+                        textColor=colors.HexColor("#03050C")
                     )
                     
                     story = []
@@ -1434,12 +1442,89 @@ def export_clients_pdf():
                     story.append(Spacer(1, 12))
                     
                     # Statistiques générales
-                    story.append(Paragraph(f"Date de génération: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-                    story.append(Paragraph(f"Clients physiques: {len(clients_physiques) if clients_physiques else 0}", styles['Normal']))
-                    story.append(Paragraph(f"Clients moraux: {len(clients_moraux) if clients_moraux else 0}", styles['Normal']))
-                    story.append(Paragraph(f"Total: {(len(clients_physiques) if clients_physiques else 0) + (len(clients_moraux) if clients_moraux else 0)}", styles['Normal']))
-                    story.append(Spacer(1, 20))
+                    info_style = styles['Normal']
+                    story.append(Paragraph(f"Date de génération: {datetime.now().strftime('%d/%m/%Y %H:%M')}", info_style))
+                    story.append(Paragraph(f"Clients physiques: {len(clients_physiques) if clients_physiques else 0}", info_style))
+                    story.append(Paragraph(f"Clients moraux: {len(clients_moraux) if clients_moraux else 0}", info_style))
+                    story.append(Paragraph(f"Total: {(len(clients_physiques) if clients_physiques else 0) + (len(clients_moraux) if clients_moraux else 0)}", info_style))
+                    story.append(Spacer(1, 30))
                     
+                    # AJOUTER LES CLIENTS PHYSIQUES
+                    if clients_physiques:
+                        story.append(Paragraph("Clients Physiques", subtitle_style))
+                        story.append(Spacer(1, 12))
+                        
+                        # Tableau des clients physiques
+                        headers_physiques = ['ID', 'Nom', 'Prénom', 'CIN', 'Téléphone', 'Email']
+                        data_physiques = [headers_physiques]
+                        
+                        for client in clients_physiques:
+                            row = [
+                                str(client.get('id', '')),
+                                client.get('nom', ''),
+                                client.get('prenom', ''),
+                                client.get('cin', ''),
+                                client.get('telephone', ''),
+                                client.get('email', '')
+                            ]
+                            data_physiques.append(row)
+                        
+                        table_physiques = Table(data_physiques)
+                        table_physiques.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 10),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 8),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ]))
+                        
+                        story.append(table_physiques)
+                        story.append(Spacer(1, 30))
+                    
+                    # AJOUTER LES CLIENTS MORAUX
+                    if clients_moraux:
+                        story.append(Paragraph("Clients Moraux", subtitle_style))
+                        story.append(Spacer(1, 12))
+                        
+                        # Tableau des clients moraux
+                        headers_moraux = ['ID', 'Raison Sociale', 'ICE', 'RC', 'Téléphone', 'Email']
+                        data_moraux = [headers_moraux]
+                        
+                        for client in clients_moraux:
+                            row = [
+                                str(client.get('id', '')),
+                                client.get('raison_sociale', '')[:30] + '...' if client.get('raison_sociale') and len(client.get('raison_sociale', '')) > 30 else client.get('raison_sociale', ''),
+                                client.get('ice', ''),
+                                client.get('rc', ''),
+                                client.get('telephone', ''),
+                                client.get('email', '')[:35] + '...' if client.get('email') and len(client.get('email', '')) > 25 else client.get('email', '')
+                            ]
+                            data_moraux.append(row)
+                        
+                        table_moraux = Table(data_moraux)
+                        table_moraux.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 10),
+                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 8),
+                            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ]))
+                        
+                        story.append(table_moraux)
+                    
+                    # Générer le PDF final
                     doc.build(story)
                     buffer.seek(0)
                     

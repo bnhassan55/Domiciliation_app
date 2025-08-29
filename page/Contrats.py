@@ -118,7 +118,7 @@ def nouveau_contrat():
         st.warning("⚠️ Aucun client enregistré. Veuillez d'abord ajouter des clients.")
         return
     
-    with st.form("form_nouveau_contrat"):
+    with st.form("form_nouveau_contrat",clear_on_submit=True):
         # Sélection du client
         st.markdown("###  Informations Client")
         

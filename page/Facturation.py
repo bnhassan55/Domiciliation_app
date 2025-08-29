@@ -143,7 +143,7 @@ def nouvelle_facture():
         st.warning("⚠️ Aucun contrat actif trouvé. Impossible de créer une facture.")
         return
     
-    with st.form("form_nouvelle_facture"):
+    with st.form("form_nouvelle_facture",clear_on_submit=True):
         # Sélection du contrat
         st.markdown("###  Contrat à Facturer")
         
