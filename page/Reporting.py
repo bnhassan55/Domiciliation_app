@@ -538,15 +538,7 @@ def rapport_contrats(date_debut, date_fin):
 # CHANGEMENT PRINCIPAL: applymap au lieu d'apply
         styled_df = df_expirants.style.applymap(color_urgence, subset=['Jours Restants'])
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
-        
-        # Export CSV
-        csv = df_expirants.to_csv(index=False)
-        st.download_button(
-            label="⭳ Télécharger contrats expirants en CSV",
-            data=csv,
-            file_name=f"contrats_expirants_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
+    
     else:
         st.success("✅ Aucun contrat n'expire dans les 60 prochains jours")
     
@@ -738,15 +730,7 @@ def rapport_financier(date_debut, date_fin):
             # Résumé des factures filtrées
             total_filtre = sum(f.get('montant_ttc', 0) for f in factures_filtrees)
             st.info(f" {len(factures_filtrees)} factures - Total: {total_filtre:,.0f} DH")
-            
-            # Export CSV
-            csv = df_factures.to_csv(index=False)
-            st.download_button(
-                label="⭳ Télécharger en CSV",
-                data=csv,
-                file_name=f"rapport_financier_{date_debut}_{date_fin}.csv",
-                mime="text/csv"
-            )
+    
         else:
             st.info("Aucune facture ne correspond aux critères de filtrage")
 
