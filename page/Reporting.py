@@ -90,17 +90,11 @@ def show():
     </div>
     """, unsafe_allow_html=True)
     # Période de rapport
-    col1, col2 = st.columns(2)
-    with col1:
-        date_debut = st.date_input(
-            "Date de début",
-            value=datetime.now().replace(day=1).date()
-        )
-    with col2:
-        date_fin = st.date_input(
-            "Date de fin",
-            value=datetime.now().date()
-        )
+    date_debut =datetime.now().replace(day=1).date()
+       
+  
+    date_fin =datetime.now().date()
+        
     
     # Tabs pour différents types de rapports
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
