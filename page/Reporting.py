@@ -93,7 +93,7 @@ def show():
     date_debut =datetime.now().replace(day=1).date()
        
   
-    date_fin =datetime.now().date()
+    date_fin = datetime.now().date()
         
     
     # Tabs pour différents types de rapports
@@ -782,16 +782,9 @@ def export_factures_pdf():
             
             # Aperçu (optionnel)
             st.markdown("###  Aperçu")
-            # pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
-            # pdf_display = f'<embed src="data:application/pdf;base64,{pdf_base64}" width="100%" height="600" type="application/pdf">'
-            # st.markdown(pdf_display, unsafe_allow_html=True)
             pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
-
-            pdf_display = f"""
-                <iframe src="data:application/pdf;base64,{pdf_base64}" width="100%" height="600" type="application/pdf"></iframe>
-            """
-
-            st.components.v1.html(pdf_display, height=600, scrolling=True)
+            pdf_display = f'<embed src="data:application/pdf;base64,{pdf_base64}" width="100%" height="600" type="application/pdf">'
+            st.markdown(pdf_display, unsafe_allow_html=True)
         else:
             st.error(" Erreur lors de la génération du PDF")
 
@@ -837,16 +830,9 @@ def export_contrats_pdf():
                 
                 # Aperçu (optionnel)
                 st.markdown("###  Aperçu")
-                # pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
-                # pdf_display = f'<embed src="data:application/pdf;base64,{pdf_base64}" width="100%" height="600" type="application/pdf">'
-                # st.markdown(pdf_display, unsafe_allow_html=True)
                 pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
-
-                pdf_display = f"""
-                                    <iframe src="data:application/pdf;base64,{pdf_base64}" width="100%" height="600" type="application/pdf"></iframe>
-                                """
-
-                st.components.v1.html(pdf_display, height=600, scrolling=True)
+                pdf_display = f'<embed src="data:application/pdf;base64,{pdf_base64}" width="100%" height="600" type="application/pdf">'
+                st.markdown(pdf_display, unsafe_allow_html=True)
             else:
                 st.error(" Erreur lors de la génération du PDF")
         else:
