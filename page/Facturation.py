@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, date
-from db import (get_all_contrats, ajouter_facture, get_all_factures, 
+from db import (get_all_contrats,
                 modifier_facture, supprimer_facture, get_facture_by_id,update_db_structure_with_client_type,
-                get_client_info,get_all_factures_corrigee,ajouter_facture_corrigee
+                get_all_factures_corrigee,ajouter_facture_corrigee
                 )
 import uuid
 
@@ -856,76 +856,8 @@ def tableau_bord_facturation():
             for facture in echeances_proches:
                 st.write(f"• {facture['numero_facture']} - {facture['date_echeance']}")
         else:
-            st.info("🗋 Aucune échéance proche")
-    ajouter_diagnostic_factures()    
+            st.info("🗋 Aucune échéance proche")  
     
-def ajouter_diagnostic_factures():
-    """Ajouter un bouton de diagnostic dans le tableau de bord"""
-    st.markdown("---")
-    st.markdown("### 🔧 Outils de Diagnostic")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🔍 Diagnostiquer Conflits"):
-            with st.spinner("Diagnostic en cours..."):
-                # Capture les messages de diagnostic
-                import io
-                import sys
-                
-                old_stdout = sys.stdout
-                sys.stdout = buffer = io.StringIO()
-                
-                try:
-                    diagnostiquer_conflits_clients()
-                    diagnostic_output = buffer.getvalue()
-                    
-                    if diagnostic_output:
-                        st.code(diagnostic_output, language="text")
-                    else:
-                        st.success("Aucun problème détecté")
-                        
-                except Exception as e:
-                    st.error(f"Erreur lors du diagnostic: {e}")
-                finally:
-                    sys.stdout = old_stdout
-    
-    with col2:
-        if st.button("🧹 Nettoyer Données"):
-            with st.spinner("Nettoyage en cours..."):
-                try:
-                    nettoyer_factures_incoherentes()
-                    st.success("Nettoyage terminé")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur lors du nettoyage: {e}")
-    
-    with col3:
-        if st.button("📊 Statistiques DB"):
-            conn = get_db_connection()
-            try:
-                # Statistiques rapides
-                stats = conn.execute("""
-                    SELECT 
-                        (SELECT COUNT(*) FROM clients_physiques) as clients_physiques,
-                        (SELECT COUNT(*) FROM clients_moraux) as clients_moraux,
-                        (SELECT COUNT(*) FROM factures WHERE client_type = 'physique') as factures_physiques,
-                        (SELECT COUNT(*) FROM factures WHERE client_type = 'moral') as factures_morales,
-                        (SELECT COUNT(*) FROM factures WHERE client_type IS NULL) as factures_sans_type
-                """).fetchone()
-                
-                st.write("**Statistiques de la base:**")
-                st.write(f"- Clients physiques: {stats['clients_physiques']}")
-                st.write(f"- Clients moraux: {stats['clients_moraux']}")
-                st.write(f"- Factures physiques: {stats['factures_physiques']}")
-                st.write(f"- Factures morales: {stats['factures_morales']}")
-                if stats['factures_sans_type'] > 0:
-                    st.warning(f"- ⚠️ Factures sans type: {stats['factures_sans_type']}")
-                
-            except Exception as e:
-                st.error(f"Erreur statistiques: {e}")
-            finally:
-                conn.close()
 def voir_details_facture(facture_id):
     """Afficher les détails complets d'une facture"""
     facture = get_facture_by_id(facture_id)

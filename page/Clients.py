@@ -1503,7 +1503,7 @@ def export_clients_pdf():
                                 client.get('ice', ''),
                                 client.get('rc', ''),
                                 client.get('telephone', ''),
-                                client.get('email', '')[:35] + '...' if client.get('email') and len(client.get('email', '')) > 25 else client.get('email', '')
+                                client.get('email', '')
                             ]
                             data_moraux.append(row)
                         

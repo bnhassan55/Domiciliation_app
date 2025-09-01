@@ -24,7 +24,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT NOT NULL,
             prenom TEXT NOT NULL,
-            sexe TEXT CHECK(sexe IN ('M', 'F')),
+            sexe TEXT CHECK(sexe IN ('M', 'F', 'Autre')),
             cin TEXT UNIQUE NOT NULL,
             telephone TEXT NOT NULL,
             email TEXT,
@@ -2212,137 +2212,8 @@ def get_all_factures_corrigee():
         return []
 
 
-# SOLUTION 5: Fonction pour nettoyer les données incohérentes
-
-def nettoyer_factures_incoherentes():
-    """
-    Nettoie les factures qui pointent vers des clients inexistants
-    """
-    conn = get_db_connection()
-    try:
-        print("Nettoyage des factures incohérentes...")
-        
-        # Identifier les factures avec des clients inexistants
-        cursor = conn.execute("""
-            SELECT f.id, f.numero_facture, f.client_id, f.client_type
-            FROM factures f
-            LEFT JOIN clients_physiques cp ON f.client_id = cp.id AND f.client_type = 'physique'
-            LEFT JOIN clients_moraux cm ON f.client_id = cm.id AND f.client_type = 'moral'
-            WHERE cp.id IS NULL AND cm.id IS NULL
-        """)
-        
-        factures_orphelines = cursor.fetchall()
-        
-        if factures_orphelines:
-            print(f"Trouvé {len(factures_orphelines)} factures orphelines:")
-            for facture in factures_orphelines:
-                print(f"  - Facture {facture['numero_facture']}: Client ID {facture['client_id']} (type: {facture['client_type']}) introuvable")
-            
-            # Demander confirmation avant suppression
-            print("Ces factures seront supprimées car elles pointent vers des clients inexistants")
-            
-            # Supprimer les factures orphelines
-            for facture in factures_orphelines:
-                conn.execute("DELETE FROM factures WHERE id = ?", (facture['id'],))
-            
-            conn.commit()
-            print(f"{len(factures_orphelines)} factures orphelines supprimées")
-        else:
-            print("Aucune facture orpheline trouvée")
-            
-    except Exception as e:
-        print(f"Erreur lors du nettoyage: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-
-# SOLUTION 6: Fonction de diagnostic pour identifier les problèmes
-
-def diagnostiquer_conflits_clients():
-    """
-    Diagnostic des conflits d'IDs entre clients physiques et moraux
-    """
-    conn = get_db_connection()
-    try:
-        print("=== DIAGNOSTIC DES CONFLITS D'IDS ===")
-        
-        # 1. Identifier les IDs en conflit
-        cursor = conn.execute("""
-            SELECT cp.id, cp.nom || ' ' || cp.prenom as nom_physique,
-                   cm.raison_sociale as nom_moral
-            FROM clients_physiques cp
-            INNER JOIN clients_moraux cm ON cp.id = cm.id
-            ORDER BY cp.id
-        """)
-        
-        conflits = cursor.fetchall()
-        
-        if conflits:
-            print(f"ATTENTION: {len(conflits)} IDs en conflit trouvés:")
-            for conflit in conflits:
-                print(f"  ID {conflit['id']}: '{conflit['nom_physique']}' (physique) vs '{conflit['nom_moral']}' (moral)")
-        else:
-            print("Aucun conflit d'ID détecté")
-        
-        # 2. Vérifier les factures problématiques
-        cursor = conn.execute("""
-            SELECT f.numero_facture, f.client_id, f.client_type,
-                   cp.nom || ' ' || cp.prenom as nom_physique,
-                   cm.raison_sociale as nom_moral
-            FROM factures f
-            LEFT JOIN clients_physiques cp ON f.client_id = cp.id
-            LEFT JOIN clients_moraux cm ON f.client_id = cm.id
-            WHERE cp.id IS NOT NULL AND cm.id IS NOT NULL
-            ORDER BY f.client_id
-        """)
-        
-        factures_ambigues = cursor.fetchall()
-        
-        if factures_ambigues:
-            print(f"\nFACTURES POTENTIELLEMENT AMBIGUES: {len(factures_ambigues)}")
-            for facture in factures_ambigues:
-                print(f"  Facture {facture['numero_facture']}: ID {facture['client_id']} (type: {facture.get('client_type', 'NON DEFINI')})")
-                print(f"    - Client physique possible: {facture['nom_physique']}")
-                print(f"    - Client moral possible: {facture['nom_moral']}")
-        
-        print("=== FIN DIAGNOSTIC ===")
-        
-    except Exception as e:
-        print(f"Erreur lors du diagnostic: {e}")
-    finally:
-        conn.close()
-
-
-# FONCTION PRINCIPALE À EXÉCUTER POUR RÉSOUDRE LE PROBLÈME
-def resoudre_probleme_ids_clients():
-    """
-    Fonction principale pour résoudre le problème des IDs clients
-    """
-    print("=== RÉSOLUTION DU PROBLÈME DES IDS CLIENTS ===")
-    
-    # Étape 1: Diagnostic
-    print("\n1. Diagnostic des conflits...")
-    diagnostiquer_conflits_clients()
-    
-    # Étape 2: Mise à jour de la structure
-    print("\n2. Mise à jour de la structure de la base de données...")
-    update_db_structure_with_client_type()
-    
-    # Étape 3: Nettoyage des données incohérentes
-    print("\n3. Nettoyage des données incohérentes...")
-    nettoyer_factures_incoherentes()
-    
-    print("\n=== RÉSOLUTION TERMINÉE ===")
-    print("Utilisez désormais ajouter_facture_corrigee() et get_all_factures_corrigee()")
-
-
-if __name__ == "__main__":
-    # Exécuter la résolution
-    resoudre_probleme_ids_clients()
 if __name__ == "__main__":
     init_db()
     print("Base de données initialisée avec succès!")
     debug_database()
     nettoyer_donnees_orphelines()
-    resoudre_probleme_ids_clients()
