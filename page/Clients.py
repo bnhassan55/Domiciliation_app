@@ -254,7 +254,7 @@ def modifier_client_physique_interface(client_id):
             )
             
             # Gestion du sexe avec valeur actuelle
-            sexe_options = ["", "M", "F", "Autre"]
+            sexe_options = ["", "M", "F"]
             current_sexe = str(client.get('sexe', ''))
             sexe_index = 0
             if current_sexe in sexe_options:
@@ -879,7 +879,7 @@ def gestion_clients_physiques():
                 nom = st.text_input("Nom *", max_chars=50, help="Nom de famille du client")
                 prenom = st.text_input("Prénom *", max_chars=50, help="Prénom du client")
                 cin = st.text_input("CIN *", max_chars=20, help="Carte d'identité nationale")
-                sexe = st.selectbox("Sexe", ["", "M", "F", "Autre"], help="Sexe du client")
+                sexe = st.selectbox("Sexe", ["", "M", "F"], help="Sexe du client")
             
             with col2:
                 telephone = st.text_input("Téléphone *", max_chars=20, help="Numéro de téléphone")

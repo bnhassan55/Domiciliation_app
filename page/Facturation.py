@@ -267,6 +267,10 @@ def nouvelle_facture():
             "Mode de Règlement",
             ["Virement bancaire", "Chèque", "Espèces", "Carte bancaire", "Prélèvement"]
         )
+        statut = st.selectbox(
+            "Statut",
+            ["En attente", "Payée", "En retard", "Annulée"]
+        )
         
         submit = st.form_submit_button("💾 Créer la Facture", use_container_width=True)
         
@@ -306,7 +310,7 @@ def nouvelle_facture():
                                 'montant_ttc': montant_ttc,
                                 'description': description.strip() if description else None,
                                 'mode_reglement': mode_reglement,
-                                'statut': 'En attente',
+                                'statut': statut,
                                 'date_creation': str(datetime.now().date())
                             }
                 if ajouter_facture_corrigee(facture_data):  # ← CHANGEMENT ICI

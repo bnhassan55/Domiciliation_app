@@ -114,7 +114,7 @@ def init_db():
             montant_ttc REAL NOT NULL,
             description TEXT,
             mode_reglement TEXT DEFAULT 'Virement',
-            statut TEXT DEFAULT 'En attente',
+            statut TEXT DEFAULT 'En attente' CHECK(statut IN ('En attente', 'Actif', 'Résilié', 'Suspendu')),
             date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (contrat_id) REFERENCES contrats(id),
             FOREIGN KEY (client_id) REFERENCES clients_physiques(id)
@@ -2211,9 +2211,211 @@ def get_all_factures_corrigee():
         print(f"Erreur lors de la récupération des factures: {e}")
         return []
 
+def migrer_contraintes_definitives():
+    """
+    Migration complète pour modifier les contraintes CHECK
+    Cette fonction recrée les tables avec les nouvelles contraintes
+    """
+    DB_PATH = os.path.join(os.path.dirname(__file__), "data", "domiciliation.db")
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        
+        print("Début de la migration des contraintes...")
+        
+        # ÉTAPE 1: Sauvegarder les données existantes des clients physiques
+        print("1. Sauvegarde des clients physiques...")
+        clients_physiques = conn.execute("SELECT * FROM clients_physiques").fetchall()
+        clients_physiques_data = [dict(row) for row in clients_physiques]
+        
+        # Nettoyer les données : remplacer 'Autre' par 'M'
+        for client in clients_physiques_data:
+            if client['sexe'] == 'Autre' or client['sexe'] is None:
+                client['sexe'] = 'M'
+        
+        print(f"   - {len(clients_physiques_data)} clients sauvegardés")
+        
+        # ÉTAPE 2: Sauvegarder les données des factures
+        print("2. Sauvegarde des factures...")
+        factures = conn.execute("SELECT * FROM factures").fetchall()
+        factures_data = [dict(row) for row in factures]
+        print(f"   - {len(factures_data)} factures sauvegardées")
+        
+        # ÉTAPE 3: Supprimer les anciennes tables
+        print("3. Suppression des anciennes tables...")
+        conn.execute("DROP TABLE IF EXISTS clients_physiques_old")
+        conn.execute("DROP TABLE IF EXISTS factures_old")
+        
+        # Renommer les tables actuelles
+        conn.execute("ALTER TABLE clients_physiques RENAME TO clients_physiques_old")
+        conn.execute("ALTER TABLE factures RENAME TO factures_old")
+        
+        # ÉTAPE 4: Créer les nouvelles tables avec les bonnes contraintes
+        print("4. Création des nouvelles tables...")
+        
+        # Nouvelle table clients_physiques (sexe M/F seulement)
+        conn.execute("""
+        CREATE TABLE clients_physiques (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom TEXT NOT NULL,
+            prenom TEXT NOT NULL,
+            sexe TEXT CHECK(sexe IN ('M', 'F')),
+            cin TEXT UNIQUE NOT NULL,
+            telephone TEXT NOT NULL,
+            email TEXT,
+            adresse TEXT,
+            date_naissance TEXT,
+            date_creation TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        # Nouvelle table factures avec plus d'options de statut
+        conn.execute("""
+        CREATE TABLE factures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero_facture TEXT UNIQUE NOT NULL,
+            contrat_id INTEGER,
+            client_id INTEGER NOT NULL,
+            client_type TEXT DEFAULT 'physique',
+            type_facture TEXT DEFAULT 'Domiciliation',
+            date_facture TEXT NOT NULL,
+            date_echeance TEXT,
+            periode_debut TEXT,
+            periode_fin TEXT,
+            montant_ht REAL NOT NULL,
+            taux_tva REAL DEFAULT 20.0,
+            montant_tva REAL,
+            montant_ttc REAL NOT NULL,
+            description TEXT,
+            mode_reglement TEXT DEFAULT 'Virement',
+            statut TEXT DEFAULT 'En attente' CHECK(statut IN ('En attente', 'Payée', 'Annulée', 'En retard', 'Partiellement payée', 'Suspendue', 'Résiliée')),
+            date_creation TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (contrat_id) REFERENCES contrats(id),
+            FOREIGN KEY (client_id) REFERENCES clients_physiques(id)
+        )
+        """)
+        
+        # ÉTAPE 5: Réinsérer les données nettoyées
+        print("5. Réinsertion des données...")
+        
+        # Clients physiques
+        for client in clients_physiques_data:
+            conn.execute("""
+                INSERT INTO clients_physiques 
+                (id, nom, prenom, sexe, cin, telephone, email, adresse, date_naissance, date_creation)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                client['id'], client['nom'], client['prenom'], client['sexe'],
+                client['cin'], client['telephone'], client['email'], client['adresse'],
+                client['date_naissance'], client['date_creation']
+            ))
+        
+        # Factures (nettoyer les statuts invalides)
+        for facture in factures_data:
+            # Mapper les anciens statuts vers les nouveaux
+            statut_ancien = facture.get('statut', 'En attente')
+            if statut_ancien not in ['En attente', 'Payée', 'Annulée', 'En retard', 'Partiellement payée', 'Suspendue', 'Résiliée']:
+                statut_nouveau = 'En attente'  # Valeur par défaut pour les statuts invalides
+            else:
+                statut_nouveau = statut_ancien
+            
+            conn.execute("""
+                INSERT INTO factures 
+                (id, numero_facture, contrat_id, client_id, client_type, type_facture,
+                 date_facture, date_echeance, periode_debut, periode_fin,
+                 montant_ht, taux_tva, montant_tva, montant_ttc,
+                 description, mode_reglement, statut, date_creation)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                facture['id'], facture['numero_facture'], facture['contrat_id'],
+                facture['client_id'], facture.get('client_type', 'physique'), facture['type_facture'],
+                facture['date_facture'], facture['date_echeance'], facture['periode_debut'], facture['periode_fin'],
+                facture['montant_ht'], facture['taux_tva'], facture['montant_tva'], facture['montant_ttc'],
+                facture['description'], facture['mode_reglement'], statut_nouveau, facture['date_creation']
+            ))
+        
+        # ÉTAPE 6: Nettoyer les anciennes tables
+        print("6. Suppression des tables de sauvegarde...")
+        conn.execute("DROP TABLE clients_physiques_old")
+        conn.execute("DROP TABLE factures_old")
+        
+        conn.commit()
+        
+        print("Migration terminée avec succès!")
+        print(f"- Clients physiques: {len(clients_physiques_data)} migrés")
+        print(f"- Factures: {len(factures_data)} migrées")
+        print("- Contrainte sexe: M/F seulement")
+        print("- Nouveaux statuts factures: En attente, Payée, Annulée, En retard, Partiellement payée, Suspendue, Résiliée")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Erreur pendant la migration: {e}")
+        try:
+            conn.rollback()
+            # Restaurer les tables si possible
+            conn.execute("ALTER TABLE clients_physiques_old RENAME TO clients_physiques")
+            conn.execute("ALTER TABLE factures_old RENAME TO factures")
+            conn.commit()
+            print("Tables restaurées après erreur")
+        except:
+            print("Impossible de restaurer les tables automatiquement")
+        return False
+        
+    finally:
+        conn.close()
 
+def verifier_migration():
+    """Vérifie que la migration s'est bien passée"""
+    DB_PATH = os.path.join(os.path.dirname(__file__), "data", "domiciliation.db")
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        
+        print("\n=== VÉRIFICATION POST-MIGRATION ===")
+        
+        # Vérifier les contraintes de sexe
+        try:
+            conn.execute("INSERT INTO clients_physiques (nom, prenom, sexe, cin, telephone) VALUES ('Test', 'Test', 'Autre', 'TEST123', '0600000000')")
+            print("ERREUR: La contrainte sexe n'est pas appliquée!")
+        except sqlite3.IntegrityError:
+            print("✓ Contrainte sexe appliquée (M/F seulement)")
+        
+        # Vérifier les contraintes de statut facture
+        try:
+            conn.execute("INSERT INTO factures (numero_facture, client_id, date_facture, montant_ht, montant_ttc, statut) VALUES ('TEST001', 1, '2024-01-01', 100, 120, 'StatusInvalide')")
+            print("ERREUR: La contrainte statut n'est pas appliquée!")
+        except sqlite3.IntegrityError:
+            print("✓ Contrainte statut facture appliquée")
+        
+        # Compter les données
+        clients = conn.execute("SELECT COUNT(*) as count FROM clients_physiques").fetchone()
+        factures = conn.execute("SELECT COUNT(*) as count FROM factures").fetchone()
+        
+        print(f"✓ Clients physiques: {clients['count']}")
+        print(f"✓ Factures: {factures['count']}")
+        
+        # Vérifier les valeurs de sexe
+        sexes = conn.execute("SELECT sexe, COUNT(*) as count FROM clients_physiques GROUP BY sexe").fetchall()
+        print("✓ Répartition des sexes:")
+        for sexe in sexes:
+            print(f"   - {sexe['sexe']}: {sexe['count']}")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"Erreur lors de la vérification: {e}")
+        return False
 if __name__ == "__main__":
     init_db()
     print("Base de données initialisée avec succès!")
     debug_database()
     nettoyer_donnees_orphelines()
+    if migrer_contraintes_definitives():
+        # Vérifier le résultat
+        verifier_migration()
+    else:
+        print("La migration a échoué")

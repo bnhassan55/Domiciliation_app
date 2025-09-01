@@ -103,10 +103,11 @@ def show():
         )
     
     # Tabs pour différents types de rapports
-    tab1, tab2, tab3, tab4= st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         " Vue d'ensemble", 
         " Clients", 
         " Contrats", 
+        " Financier",
         " Exports PDF"
     ])
     
@@ -120,6 +121,9 @@ def show():
         rapport_contrats(date_debut, date_fin)
     
     with tab4:
+        rapport_financier(date_debut, date_fin)
+    
+    with tab5:
         exports_pdf()
 
 def vue_ensemble(date_debut, date_fin):
@@ -569,6 +573,182 @@ def rapport_contrats(date_debut, date_fin):
             fig = px.bar(df_evolution, x='Mois', y='Nouveaux Contrats', 
                         title="Évolution Mensuelle des Nouveaux Contrats")
             st.plotly_chart(fig, use_container_width=True)
+
+def rapport_financier(date_debut, date_fin):
+    """Rapport financier détaillé - CORRIGÉ"""
+    st.subheader("Rapport Financier")
+    
+    factures = get_all_factures()
+    
+    if not factures:
+        st.info("Aucune facture enregistrée")
+        return
+    
+    # Filtrer les factures par période
+    factures_periode = []
+    for facture in factures:
+        try:
+            date_facture = datetime.strptime(facture.get('date_facture', '1900-01-01'), '%Y-%m-%d').date()
+            if date_debut <= date_facture <= date_fin:
+                factures_periode.append(facture)
+        except:
+            continue
+    
+    # Calculs financiers
+    ca_total = sum(f.get('montant_ttc', 0) for f in factures_periode)
+    ca_paye = sum(f.get('montant_ttc', 0) for f in factures_periode if f.get('statut') == 'Payée')
+    ca_attente = sum(f.get('montant_ttc', 0) for f in factures_periode if f.get('statut') in ['En attente', 'En retard'])
+    ca_ht_total = sum(f.get('montant_ht', 0) for f in factures_periode)
+    tva_total = sum(f.get('montant_tva', 0) for f in factures_periode)
+    
+    # Métriques financières
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("CA Total Période", f"{ca_total:,.0f} DH")
+        st.caption(f"HT: {ca_ht_total:,.0f} DH")
+    
+    with col2:
+        st.metric("CA Encaissé", f"{ca_paye:,.0f} DH")
+        taux_encaissement = (ca_paye / ca_total * 100) if ca_total > 0 else 0
+        st.caption(f"Taux: {taux_encaissement:.1f}%")
+    
+    with col3:
+        st.metric("En Attente", f"{ca_attente:,.0f} DH")
+        st.caption(f"TVA totale: {tva_total:,.0f} DH")
+    
+    with col4:
+        nb_factures = len(factures_periode)
+        panier_moyen = ca_total / nb_factures if nb_factures > 0 else 0
+        st.metric("Panier Moyen", f"{panier_moyen:,.0f} DH")
+        st.caption(f"Nb factures: {nb_factures}")
+    
+    # Graphiques financiers
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Évolution mensuelle du CA
+        if factures_periode:
+            ca_mensuel = {}
+            for facture in factures_periode:
+                try:
+                    date_facture = datetime.strptime(facture.get('date_facture', '1900-01-01'), '%Y-%m-%d')
+                    mois = date_facture.strftime('%Y-%m')
+                    ca_mensuel[mois] = ca_mensuel.get(mois, 0) + facture.get('montant_ttc', 0)
+                except:
+                    continue
+            
+            if ca_mensuel:
+                df_ca = pd.DataFrame(list(ca_mensuel.items()), columns=['Mois', 'CA'])
+                df_ca = df_ca.sort_values('Mois')
+                fig = px.bar(df_ca, x='Mois', y='CA', title="CA Mensuel (TTC)")
+                fig.update_layout(yaxis_title="CA (DH)")
+                st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Répartition par statut de paiement
+        statuts_paiement = {}
+        for facture in factures_periode:
+            statut = facture.get('statut', 'Inconnu')
+            montant = facture.get('montant_ttc', 0)
+            statuts_paiement[statut] = statuts_paiement.get(statut, 0) + montant
+        
+        if statuts_paiement:
+            fig = px.pie(
+                values=list(statuts_paiement.values()), 
+                names=list(statuts_paiement.keys()), 
+                title="Répartition par Statut de Paiement"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Analyse des retards de paiement
+    factures_retard = []
+    for facture in factures_periode:
+        if facture.get('statut') in ['En attente', 'En retard']:
+            try:
+                date_echeance = datetime.strptime(facture.get('date_echeance', facture.get('date_facture', '1900-01-01')), '%Y-%m-%d').date()
+                jours_retard = (datetime.now().date() - date_echeance).days
+                if jours_retard > 0:
+                    facture_data = dict(facture)
+                    facture_data['jours_retard'] = jours_retard
+                    factures_retard.append(facture_data)
+            except:
+                continue
+    
+    if factures_retard:
+        st.markdown("###  Factures en Retard de Paiement")
+        
+        tableau_retards = []
+        for facture in sorted(factures_retard, key=lambda x: x['jours_retard'], reverse=True):
+            tableau_retards.append({
+                'Numéro': facture['numero_facture'],
+                'Client': facture.get('client_nom', 'N/A'),
+                'Date Facture': facture['date_facture'],
+                'Date Échéance': facture.get('date_echeance', 'N/A'),
+                'Montant TTC': f"{facture['montant_ttc']:,.0f} DH",
+                'Jours de Retard': facture['jours_retard'],
+                'Statut': facture['statut']
+            })
+        
+        df_retards = pd.DataFrame(tableau_retards)
+        st.dataframe(df_retards, use_container_width=True, hide_index=True)
+        
+        # Total des impayés
+        total_impayes = sum(f['montant_ttc'] for f in factures_retard)
+        st.error(f" Total des impayés en retard: {total_impayes:,.0f} DH")
+    
+    # Tableau détaillé des factures de la période
+    if factures_periode:
+        st.markdown("###  Détail des Factures de la Période")
+        
+        # Options de filtrage
+        col1, col2 = st.columns(2)
+        with col1:
+            statuts_disponibles = ['Tous'] + list(set(f.get('statut', '') for f in factures_periode))
+            statut_filtre = st.selectbox("Filtrer par statut", statuts_disponibles)
+        
+        with col2:
+            montant_min = st.number_input("Montant minimum (DH)", min_value=0, value=0)
+        
+        # Appliquer les filtres
+        factures_filtrees = factures_periode
+        if statut_filtre != 'Tous':
+            factures_filtrees = [f for f in factures_filtrees if f.get('statut') == statut_filtre]
+        if montant_min > 0:
+            factures_filtrees = [f for f in factures_filtrees if f.get('montant_ttc', 0) >= montant_min]
+        
+        # Tableau des factures
+        if factures_filtrees:
+            tableau_factures = []
+            for facture in factures_filtrees:
+                tableau_factures.append({
+                    'Numéro': facture['numero_facture'],
+                    'Client': facture.get('client_nom', 'N/A'),
+                    'Date': facture['date_facture'],
+                    'Montant HT': f"{facture.get('montant_ht', 0):,.2f} DH",
+                    'TVA': f"{facture.get('montant_tva', 0):,.2f} DH",
+                    'Montant TTC': f"{facture.get('montant_ttc', 0):,.2f} DH",
+                    'Statut': facture['statut'],
+                    'Mode': facture.get('mode_reglement', 'N/A')
+                })
+            
+            df_factures = pd.DataFrame(tableau_factures)
+            st.dataframe(df_factures, use_container_width=True, hide_index=True)
+            
+            # Résumé des factures filtrées
+            total_filtre = sum(f.get('montant_ttc', 0) for f in factures_filtrees)
+            st.info(f" {len(factures_filtrees)} factures - Total: {total_filtre:,.0f} DH")
+            
+            # Export CSV
+            csv = df_factures.to_csv(index=False)
+            st.download_button(
+                label="⭳ Télécharger en CSV",
+                data=csv,
+                file_name=f"rapport_financier_{date_debut}_{date_fin}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("Aucune facture ne correspond aux critères de filtrage")
 
 def exports_pdf():
     """Section pour les exports PDF"""
